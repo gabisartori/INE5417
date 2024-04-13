@@ -1,0 +1,2 @@
+BACKGROUND_COLOR = "white"
+WAITING_COLOR = "gray"
