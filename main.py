@@ -24,11 +24,16 @@ class HexInterface:
         self._root = tk.Tk()
         self._root.title("Hex")
         
+        # Set app icon from png
+        self._root.iconphoto(False, tk.PhotoImage(file='assets/logo.png'))
+
         # Math for drawing cells
         self.__game_size: int = game_size
+        self.__side_bar_width = 5
         self._canvas_size_x: int = 800
         self._hex_side_size = self._canvas_size_x / (1.5*((self.__game_size)*3**(1/2)))
-        self._canvas_size_y = 1.5*self._hex_side_size * self.__game_size + self._hex_side_size/2
+        self._canvas_size_x += 2*self.__side_bar_width
+        self._canvas_size_y = 1.5*self._hex_side_size * self.__game_size + self._hex_side_size/2 + 2*self.__side_bar_width
 
         self.__local_player: Player = Player("Player 1", "blue")
         self.__remote_player: Player = Player("Player 2", "red")
@@ -74,14 +79,49 @@ class HexInterface:
         self.__local_player_label.grid(row=1, column=2, padx=10)
         self.__remote_player_label.grid(row=3, column=0, padx=10)
 
+        # Board
         self.__canvas.grid(row=2, column=1, padx=10, pady=10)
 
         self.__current_player_label.grid(row=1, column=0, pady=10)
+
+        # Draw top and bottom bars for local player
+        bar_size = self._hex_side_size*3**(1/2)*self.__game_size
+        bottom_bar_offset = bar_size/2 - self._hex_side_size/2
+        top_bar_coords = (
+            0, 0,
+            bar_size, self.__side_bar_width,
+        )
+        bottom_bar_coords = (
+            bottom_bar_offset, self._canvas_size_y - self.__side_bar_width,
+            bottom_bar_offset + bar_size, self._canvas_size_y,
+        )
+
+        left_bar_coords = (
+            -self._hex_side_size*3**(1/2)/2, 0,
+            bottom_bar_offset, self._canvas_size_y
+        )
+
+        right_bar_coords = (
+            bar_size, 0,
+            self.__side_bar_width + bar_size + self.__game_size*self._hex_side_size*3**(1/2)/2, self._canvas_size_y
+        )
+
+        # Draw side bars for each player goals
+        if self.__local_player != None:
+            self.__canvas.create_rectangle(*top_bar_coords, fill=self.__local_player.color)
+            self.__canvas.create_rectangle(*bottom_bar_coords, fill=self.__local_player.color)
+
+        if self.__remote_player != None:
+            self.__canvas.create_line(*left_bar_coords, fill=self.__remote_player.color, width=self.__side_bar_width)
+            self.__canvas.create_line(*right_bar_coords, fill=self.__remote_player.color, width=self.__side_bar_width)
 
     def draw_hexagon(self, i, j, color, edgecolor='black'):
         side_root3_half = 3**(1/2)*self._hex_side_size/2
         x = 2*i*side_root3_half + j*side_root3_half
         y = 1.5*j*self._hex_side_size
+
+        x += self.__side_bar_width
+        y += self.__side_bar_width
 
         self.__canvas.create_polygon(
             x + side_root3_half, y,
