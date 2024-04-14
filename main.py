@@ -1,7 +1,5 @@
-from enum import Enum
 import tkinter as tk
 from style import *
-import random
 import math
 
 class Player():
@@ -55,6 +53,10 @@ class HexInterface:
         self.__canvas = tk.Canvas(self._root, width=self._canvas_size_x, height=self._canvas_size_y)
         self.__canvas.tag_bind("hexagon", "<Button-1>", lambda e: self.player_click(e))
 
+        # Action buttons
+        self.__local_player_action_button = tk.Button(self._root, text=self.__local_player.name, command=lambda: self.player_action(self.__local_player))
+        self.__remote_player_action_button = tk.Button(self._root, text=self.__remote_player.name, command=lambda: self.player_action(self.__remote_player))
+
         self.load_styles()
         self.game_screen()
 
@@ -78,6 +80,9 @@ class HexInterface:
 
         self.__local_player_label.grid(row=1, column=2, padx=10)
         self.__remote_player_label.grid(row=3, column=0, padx=10)
+
+        self.__local_player_action_button.grid(row=1, column=1, padx=10, sticky="e")
+        self.__remote_player_action_button.grid(row=3, column=1, padx=10, sticky="w")
 
         # Board
         self.__canvas.grid(row=2, column=1, padx=10, pady=10)
@@ -147,13 +152,12 @@ class HexInterface:
 
         self.draw_hexagon(i, j, self.__current_player.color)
 
+        print(f"{self.__current_player.name} clicou em um hexágono na posição ({i}, {j})")
         if self.__current_player == self.__local_player:
             self.__current_player = self.__remote_player
-            print("Jogador local clicou")
         else:
             self.__current_player = self.__local_player
-            print("Jogador remoto clicou")
-        
+ 
         self.__current_player_label.configure(text=f"Vez do {self.__current_player.name}", fg=self.__current_player.color)
 
     def get_coords(self, x, y):
@@ -164,6 +168,13 @@ class HexInterface:
         j = int(math.floor(y/(1.5*self._hex_side_size)))
         i = int(math.floor((x-j*self._hex_side_size*3**(1/2)/2)/(self._hex_side_size*3**(1/2))))
         return i, j
+
+    def player_action(self, player: Player):
+        print(f"{player.name} apertou seu botão de ação")
+        if player == self.__local_player:
+            self.__local_player_action_button.configure(bg=player.color, fg=BACKGROUND_COLOR)
+        else:
+            self.__remote_player_action_button.configure(bg=player.color, fg=BACKGROUND_COLOR)
 
 if __name__ == "__main__":
     hex_interface = HexInterface()
