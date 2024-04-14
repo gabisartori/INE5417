@@ -42,7 +42,7 @@ class HexInterface:
         ### Screen components
         # Game title
         self.__title_frame = tk.Frame(self._root, bg=BACKGROUND_COLOR)
-        self.__game_title = tk.Label(self.__title_frame, text="Hex", font=("Helvetica", 24), bg=BACKGROUND_COLOR, fg="black", pady=10)
+        self.__game_title_label = tk.Label(self.__title_frame, text="Hex", font=("Helvetica", 24), bg=BACKGROUND_COLOR, fg="black", pady=10)
 
         # Player labels
         self.__local_player_label = tk.Label(self._root, text="Local Player")
@@ -73,7 +73,7 @@ class HexInterface:
 
     def game_screen(self):
         '''Draws the game screen with the game title, player labels and action buttons, and the canvas for the game board.'''
-        self.__game_title.pack()
+        self.__game_title_label.pack()
         self.__title_frame.grid(row=0, column=1)
 
         self.__local_player_label.grid(row=1, column=2, padx=10)
