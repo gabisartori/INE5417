@@ -41,23 +41,33 @@ class Game():
         self._board[i][j] = cell
         return cell
 
-    def check_winner(self, x, y, cell: Cell):
-        '''Looks for a path connecting both sides of the board for the given cell type.'''
-        stack = [(x, y)]
-        visited = set()
-        start = False
-        end = False
-        while stack:
-            i, j = stack.pop()
-            visited.add((i, j))
+    def check_winner(self, cell: Cell):
+        queue = [(0, b) if cell == Cell.REMOTE else (b, 0) for b in range(self.size)]
+        queue = [possible_start for possible_start in queue if self._board[possible_start[0]][possible_start[1]] == cell]
+        possible_end_cells = [(self.size-1, b) if cell == Cell.REMOTE else (b, self.size-1) for b in range(self.size)]
+        possible_end_cells = [possible_cell for possible_cell in possible_end_cells if self._board[possible_cell[0]][possible_cell[1]] == cell]
 
-            if (cell == Cell.LOCAL and j == 0) or (cell == Cell.REMOTE and i == 0): start = True
-            if (cell == Cell.LOCAL and j == self.size-1) or (cell == Cell.REMOTE and i == self.size-1): end = True
-            if start and end: return visited
+        current_cell = None
 
-            for neighbor in self.cell_neighbors(i, j):
-                if neighbor not in visited and self._board[neighbor[0]][neighbor[1]] == cell:
-                    stack.append(neighbor)
+        bfs_visited = set(queue)
+        bfs_tree = {}
+
+        while queue:
+            current_cell = queue.pop(0)
+            if current_cell in possible_end_cells: break
+            
+            for neighbor in self.cell_neighbors(*current_cell):
+                if (neighbor not in bfs_visited) and self._board[neighbor[0]][neighbor[1]] == cell:
+                    bfs_tree[neighbor] = current_cell
+                    queue.append(neighbor)
+                    bfs_visited.add(neighbor)
+        else:
+            return None
+        # Use the bfs tree to find the path from start to end
+        path = [current_cell]
+        while path[-1] in bfs_tree: path.append(bfs_tree[path[-1]])
+
+        return path
 
     def cell_neighbors(self, i, j) -> set[Cell]:
         neighbors = set()
@@ -68,6 +78,7 @@ class Game():
                 neighbors.add((x+i, y+j))
 
         return neighbors
+
     @property
     def size(self) -> int:
         return self._size
@@ -290,7 +301,7 @@ class HexInterface:
         if self._game.insert_cell(i, j, cell_value) == None: return
 
         self.draw_hexagon(i, j, self._game.current_player_turn.color)
-        winning_path = self._game.check_winner(i, j, cell_value)
+        winning_path = self._game.check_winner(cell_value)
 
         if winning_path != None:
             print(f"{self._game.current_player_turn.name} wins!")
