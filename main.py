@@ -35,7 +35,39 @@ class Game():
         self._remote_player = None
         self._current_player_turn = None
         self.game_state = GameState.WAITING
-    
+
+    def insert_cell(self, i, j, cell: Cell):
+        if self._board[i][j] != Cell.EMPTY: return None
+        self._board[i][j] = cell
+        return cell
+
+    def check_winner(self, x, y, cell: Cell):
+        '''Looks for a path connecting both sides of the board for the given cell type.'''
+        stack = [(x, y)]
+        visited = set()
+        start = False
+        end = False
+        while stack:
+            i, j = stack.pop()
+            visited.add((i, j))
+
+            if (cell == Cell.LOCAL and j == 0) or (cell == Cell.REMOTE and i == 0): start = True
+            if (cell == Cell.LOCAL and j == self.size-1) or (cell == Cell.REMOTE and i == self.size-1): end = True
+            if start and end: return visited
+
+            for neighbor in self.cell_neighbors(i, j):
+                if neighbor not in visited and self._board[neighbor[0]][neighbor[1]] == cell:
+                    stack.append(neighbor)
+
+    def cell_neighbors(self, i, j) -> set[Cell]:
+        neighbors = set()
+        for x in range(-1, 2):
+            for y in range(-1, 2):
+                if (x == y == 0) or (x == -1 and y == -1) or (x == 1 and y == 1): continue
+                if x+i < 0 or x+i >= self.size or y+j < 0 or y+j >= self.size: continue
+                neighbors.add((x+i, y+j))
+
+        return neighbors
     @property
     def size(self) -> int:
         return self._size
@@ -152,6 +184,7 @@ class HexInterface:
 
         self.__local_player_label.grid(row=1, column=2, padx=10)
         self.__remote_player_label.grid(row=3, column=0, padx=10)
+        self.__current_player_label.grid(row=1, column=0, padx=10)
 
         self.local_player_action_button.grid(row=1, column=1, sticky="e", padx=10)
         self.remote_player_action_button.grid(row=3, column=1, sticky="w", padx=10)
@@ -222,7 +255,7 @@ class HexInterface:
         if self._game.game_state == GameState.WAITING:
             self._ready_players = min(self._ready_players + 1, 2)
             if self._ready_players == 2: self.start_game()
-        elif self._game.game_state == GameState.RUNNING:
+        elif self._game.game_state == GameState.RUNNING or self._game.game_state == GameState.ENDED:
             self._restart_votes = min(self._restart_votes + 1, 2)
             if self._restart_votes == 2: self.restart_game()
 
@@ -240,6 +273,7 @@ class HexInterface:
         self._ready_players = 0
         self._restart_votes = 0
         self._game.game_state = GameState.WAITING
+        self._game.board = [[Cell.EMPTY for _ in range(self._game.size)] for _ in range(self._game.size)]
         self.load_styles()
 
     def add_player(self, player: Player):
@@ -252,16 +286,25 @@ class HexInterface:
         i, j = self.get_coords(event.x, event.y)
         if i < 0 or i >= self._game.size or j < 0 or j >= self._game.size: return
 
-        self.draw_hexagon(i, j, self._game.current_player_turn.color)
+        cell_value = Cell.LOCAL if self._game.current_player_turn == self._game.local_player else Cell.REMOTE
+        if self._game.insert_cell(i, j, cell_value) == None: return
 
-        if self._game.current_player_turn == self._game.local_player:
-            self._game.current_player_turn = self._game.remote_player
-            print("Jogador local clicou")
-        else:
-            self._game.current_player_turn = self._game.local_player
-            print("Jogador remoto clicou")
-        
+        self.draw_hexagon(i, j, self._game.current_player_turn.color)
+        winning_path = self._game.check_winner(i, j, cell_value)
+
+        if winning_path != None:
+            print(f"{self._game.current_player_turn.name} wins!")
+            self._game.game_state = GameState.ENDED
+            self.draw_winning_path(self._game.current_player_turn, winning_path)
+            return
+
+        self._game.current_player_turn = self._game.local_player if self._game.current_player_turn == self._game.remote_player else self._game.remote_player        
         self.__current_player_label.configure(text=f"Vez do {self._game.current_player_turn.name}", fg=self._game.current_player_turn.color)
+
+    def draw_winning_path(self, winner, winning_path):
+        winner_color = 'pink' if winner == self._game.local_player else 'lightblue'
+        for i, j in winning_path:
+            self.draw_hexagon(i, j, winner_color)
 
     def get_coords(self, x, y):
         # y = 1.5*j*side_size
