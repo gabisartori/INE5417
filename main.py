@@ -3,6 +3,7 @@ import tkinter as tk
 from style import *
 import random
 import math
+from colorsys import hsv_to_rgb
 
 class GameState(Enum):
     WAITING = 0
@@ -15,9 +16,19 @@ class Cell(Enum):
     REMOTE = 2
 
 class Player():
-    def __init__(self, name, color) -> None:
+    def __init__(self, name, hue) -> None:
         self._name = name
-        self._color = color
+        r, g, b = [hex(int(c*255))[2:] for c in hsv_to_rgb(hue, 1.0, 0.9)]
+        if len(r) == 1: r = '0' + r
+        if len(g) == 1: g = '0' + g
+        if len(b) == 1: b = '0' + b
+
+        self._color = "#" + r + g + b
+        r, g, b = [hex(int(c*255))[2:] for c in hsv_to_rgb(hue, 0.3, 0.9)]
+        if len(r) == 1: r = '0' + r
+        if len(g) == 1: g = '0' + g
+        if len(b) == 1: b = '0' + b
+        self._piece_color = "#" + r + g + b
 
     @property
     def name(self):
@@ -26,6 +37,10 @@ class Player():
     @property
     def color(self):
         return self._color
+
+    @property
+    def piece_color(self):
+        return self._piece_color
 
 class Game():
     def __init__(self, size=11) -> None:
@@ -227,7 +242,7 @@ class HexInterface:
 
         # Draw side bars for each player goals
         if self._game.local_player != None:
-            self.__canvas.create_rectangle(*top_bar_coords, fill='red')
+            self.__canvas.create_rectangle(*top_bar_coords, fill=self._game.local_player.color)
             self.__canvas.create_rectangle(*bottom_bar_coords, fill=self._game.local_player.color)
 
         if self._game.remote_player != None:
@@ -300,7 +315,7 @@ class HexInterface:
         cell_value = Cell.LOCAL if self._game.current_player_turn == self._game.local_player else Cell.REMOTE
         if self._game.insert_cell(i, j, cell_value) == None: return
 
-        self.draw_hexagon(i, j, self._game.current_player_turn.color)
+        self.draw_hexagon(i, j, self._game.current_player_turn.piece_color)
         winning_path = self._game.check_winner(cell_value)
 
         if winning_path != None:
@@ -310,12 +325,11 @@ class HexInterface:
             return
 
         self._game.current_player_turn = self._game.local_player if self._game.current_player_turn == self._game.remote_player else self._game.remote_player        
-        self.__current_player_label.configure(text=f"Vez do {self._game.current_player_turn.name}", fg=self._game.current_player_turn.color)
+        self.__current_player_label.configure(text=f"Vez de {self._game.current_player_turn.name}", fg=self._game.current_player_turn.color)
 
-    def draw_winning_path(self, winner, winning_path):
-        winner_color = 'pink' if winner == self._game.local_player else 'lightblue'
+    def draw_winning_path(self, winner: Player, winning_path):
         for i, j in winning_path:
-            self.draw_hexagon(i, j, winner_color)
+            self.draw_hexagon(i, j, winner.color, edgecolor='black')
 
     def get_coords(self, x, y):
         # y = 1.5*j*side_size
@@ -327,8 +341,13 @@ class HexInterface:
         return i, j
 
 if __name__ == "__main__":
+    p1_name = "Player 1"
+    p2_name = "Player 2"
+    p1_color_hue = sum([ord(c) for c in p1_name]) % 256 / 256
+    p2_color_hue = (p1_color_hue + 0.5) % 1
+
     hex_interface = HexInterface()
-    hex_interface.add_player(Player("Player 1", "red"))
-    hex_interface.add_player(Player("Player 2", "blue"))
+    hex_interface.add_player(Player(p1_name, p1_color_hue))
+    hex_interface.add_player(Player(p2_name, p2_color_hue))
     hex_interface.game_screen()
     hex_interface._root.mainloop()
