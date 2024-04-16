@@ -94,6 +94,11 @@ class Game():
 
         return neighbors
 
+    def restart(self):
+        self.game_state = GameState.WAITING
+        self.board = [[Cell.EMPTY for _ in range(self.size)] for _ in range(self.size)]
+        self.current_player_turn = None
+
     @property
     def size(self) -> int:
         return self._size
@@ -174,8 +179,8 @@ class HexInterface:
         self.__game_title = tk.Label(self.__title_frame, text="Hex", font=("Helvetica", 24), bg=BACKGROUND_COLOR, fg="black", pady=10)
 
         # Player labels
-        self.__local_player_label = tk.Label(self._root, text="Local Player")
-        self.__remote_player_label = tk.Label(self._root, text="Remote Player")
+        self.__local_player_label = tk.Label(self._root, text="Waiting")
+        self.__remote_player_label = tk.Label(self._root, text="Waiting")
 
         # Player action buttons
         self.local_player_action_button = tk.Button(command=lambda: self.player_press_action_button(self._game.local_player))
@@ -186,22 +191,35 @@ class HexInterface:
 
         # Canva
         self.__canvas = tk.Canvas(self._root, width=self._canvas_size_x, height=self._canvas_size_y)
-        self.__canvas.tag_bind("hexagon", "<Button-1>", lambda e: self.player_click(e))
 
     def load_styles(self):
         self._root.configure(bg=BACKGROUND_COLOR)
-        local_player_color = self._game.local_player.color if self._game.local_player != None else WAITING_COLOR
-        remote_player_color = self._game.remote_player.color if self._game.remote_player != None else WAITING_COLOR
-
-        self.__local_player_label.configure(bg= BACKGROUND_COLOR, fg=local_player_color)
-        self.__remote_player_label.configure(bg= BACKGROUND_COLOR, fg=remote_player_color)
+        if self._game.local_player != None:
+            self.__local_player_label.configure(text=self._game.local_player.name)
+        if self._game.remote_player != None:
+            self.__remote_player_label.configure(text=self._game.remote_player.name)
+            self.__local_player_label.configure(bg=BACKGROUND_COLOR, fg=self._game.local_player.color)
+            self.__remote_player_label.configure(bg=BACKGROUND_COLOR, fg=self._game.remote_player.color)
+            self.__current_player_label.configure(text=f"Vez de {self._game.remote_player.name}", fg=BACKGROUND_COLOR)
 
         # Set action buttons to "waiting for game to start" (WAITING) state
         self.local_player_action_button.configure(text="ready", bg='white', fg='black')
         self.remote_player_action_button.configure(text="ready", bg='white', fg='black')
-        self.__current_player_label.configure(text="")
 
-        [self.draw_hexagon(i, j, 'white') for i in range(self._game.size) for j in range(self._game.size)]
+        # Set canvas background color and bind mouse events to empty hexagons
+        def handle_mouse_int(hexagon):
+            if self._game.game_state != GameState.RUNNING: return
+            self.__canvas.itemconfig(hexagon, fill=self._game.current_player_turn.piece_color)
+        def handle_mouse_out(hexagon):
+            if self._game.game_state != GameState.RUNNING: return
+            self.__canvas.itemconfig(hexagon, fill='white')
+
+        for i in range(self._game.size):
+            for j in range(self._game.size):
+                hexagon = self.draw_hexagon(i, j, 'white')
+                self.__canvas.tag_bind(hexagon, "<Button-1>", lambda e, i=i, j=j: self.hex_clicked(i, j))
+                self.__canvas.tag_bind(hexagon, "<Enter>", lambda e, hexagon=hexagon: handle_mouse_int(hexagon))
+                self.__canvas.tag_bind(hexagon, "<Leave>", lambda e, hexagon=hexagon: handle_mouse_out(hexagon))
 
     def game_screen(self):
         '''Draws the game screen with the game title, player labels and action buttons, and the canvas for the game board.'''
@@ -232,7 +250,7 @@ class HexInterface:
         x += self.__canvas_padding
         y += self.__canvas_padding
 
-        self.__canvas.create_polygon(
+        hexagon = self.__canvas.create_polygon(
             x + side_root3/2, self.fix_y(y),
             x + side_root3, self.fix_y(y + self._hex_side_size/2),
             x + side_root3, self.fix_y(y + 3*self._hex_side_size/2),
@@ -244,6 +262,7 @@ class HexInterface:
             outline=edgecolor,
             tags="hexagon"
         )
+        return hexagon
 
     def draw_triangle(self, i: int, start: bool, player: Player):
         side_root3 = 3**(1/2)*self._hex_side_size
@@ -291,7 +310,6 @@ class HexInterface:
                 start_x = self.__canvas_padding + (self._game.size)*side_root3
                 x = start_x + (i-1)*side_root3/2
                 y = self.__canvas_padding + i*1.5*self._hex_side_size
-                print(y)
 
                 coords.append(x)
                 coords.append(self.fix_y(y))
@@ -308,8 +326,6 @@ class HexInterface:
         )
 
     def player_press_action_button(self, player: Player):
-        print(f"{player.name} pressed the action button")
-
         if player == self._game.local_player:
             self.local_player_action_button.configure(bg=player.color, fg="white")
         else:
@@ -322,8 +338,6 @@ class HexInterface:
             self._restart_votes = min(self._restart_votes + 1, 2)
             if self._restart_votes == 2: self.restart_game()
 
-        print(f"Game state: {self._game.game_state}")
-
     def start_game(self):
         self._game.game_state = GameState.RUNNING
         self._game.current_player_turn = (self._game.local_player, self._game.remote_player)[random.randint(0, 1)]
@@ -335,18 +349,20 @@ class HexInterface:
     def restart_game(self):
         self._ready_players = 0
         self._restart_votes = 0
-        self._game.game_state = GameState.WAITING
-        self._game.board = [[Cell.EMPTY for _ in range(self._game.size)] for _ in range(self._game.size)]
+        self._game.restart()
+        self.__game_title.configure(text="Hex")
         self.load_styles()
 
     def add_player(self, player: Player):
-        if self._game.local_player == None: self._game.local_player = player
-        else: self._game.remote_player = player
+        if self._game.local_player == None:
+            self._game.local_player = player
+        else:
+            self._game.remote_player = player
+            hex_interface.game_screen()
         self.load_styles()
 
-    def player_click(self, event):
+    def hex_clicked(self, i, j):
         if self._game.game_state != GameState.RUNNING: return
-        i, j = self.get_hex_index_by_coords(event.x, event.y)
         if i < 0 or i >= self._game.size or j < 0 or j >= self._game.size: return
 
         cell_value = Cell.LOCAL if self._game.current_player_turn == self._game.local_player else Cell.REMOTE
@@ -356,7 +372,7 @@ class HexInterface:
         winning_path = self._game.check_winner(cell_value)
 
         if winning_path != None:
-            print(f"{self._game.current_player_turn.name} wins!")
+            self.__game_title.configure(text=f"{self._game.current_player_turn.name} venceu!")
             self._game.game_state = GameState.ENDED
             self.draw_winning_path(self._game.current_player_turn, winning_path)
             return
@@ -367,19 +383,6 @@ class HexInterface:
     def draw_winning_path(self, winner: Player, winning_path):
         for i, j in winning_path:
             self.draw_hexagon(i, j, winner.color, edgecolor='black')
-
-    def get_hex_index_by_coords(self, x, y):
-        # y = 1.5*j*side_size
-        # x = 2*i*side_root3_half + j*side_root3_half
-        # j = y/(1.5*side_size)
-        # i = (x-j*side_root3_half)/(side_root3_half*2)
-        y = self.fix_y(y)
-        x -= self.__canvas_padding
-        y -= self.__canvas_padding
-
-        j = int(math.floor(y/(1.5*self._hex_side_size)))
-        i = int(math.floor((x-j*self._hex_side_size*3**(1/2)/2)/(self._hex_side_size*3**(1/2))))
-        return i, j
 
     def fix_y(self, y):
         return self._canvas_size_y - y
@@ -393,5 +396,4 @@ if __name__ == "__main__":
     hex_interface = HexInterface()
     hex_interface.add_player(Player(p1_name, p1_color_hue))
     hex_interface.add_player(Player(p2_name, p2_color_hue))
-    hex_interface.game_screen()
     hex_interface._root.mainloop()
