@@ -222,22 +222,22 @@ class HexInterface:
         bar_size = self._hex_side_size*3**(1/2)*self._game.size
         bottom_bar_offset = bar_size/2 - self._hex_side_size/2
         top_bar_coords = (
-            0, 0,
-            bar_size, self.__side_bar_width,
+            0, self.fix_y(0),
+            bar_size, self.fix_y(self.__side_bar_width),
         )
         bottom_bar_coords = (
-            bottom_bar_offset, self._canvas_size_y - self.__side_bar_width,
-            bottom_bar_offset + bar_size, self._canvas_size_y,
+            bottom_bar_offset, self.fix_y(self._canvas_size_y - self.__side_bar_width),
+            bottom_bar_offset + bar_size, self.fix_y(self._canvas_size_y),
         )
 
         left_bar_coords = (
-            -self._hex_side_size*3**(1/2)/2, 0,
-            bottom_bar_offset, self._canvas_size_y
+            -self._hex_side_size*3**(1/2)/2, self.fix_y(0),
+            bottom_bar_offset, self.fix_y(self._canvas_size_y)
         )
 
         right_bar_coords = (
-            bar_size, 0,
-            self.__side_bar_width + bar_size + self._game.size*self._hex_side_size*3**(1/2)/2, self._canvas_size_y
+            bar_size, self.fix_y(0),
+            self.__side_bar_width + bar_size + self._game.size*self._hex_side_size*3**(1/2)/2, self.fix_y(self._canvas_size_y)
         )
 
         # Draw side bars for each player goals
@@ -258,12 +258,12 @@ class HexInterface:
         y += self.__side_bar_width
 
         self.__canvas.create_polygon(
-            x + side_root3_half, y,
-            x + 2*side_root3_half, y + self._hex_side_size/2,
-            x + 2*side_root3_half, y + 3*self._hex_side_size/2,
-            x + side_root3_half, y + 2*self._hex_side_size,
-            x, y + 3*self._hex_side_size/2,
-            x, y + self._hex_side_size/2,
+            x + side_root3_half, self.fix_y(y),
+            x + 2*side_root3_half, self.fix_y(y + self._hex_side_size/2),
+            x + 2*side_root3_half, self.fix_y(y + 3*self._hex_side_size/2),
+            x + side_root3_half, self.fix_y(y + 2*self._hex_side_size),
+            x, self.fix_y(y + 3*self._hex_side_size/2),
+            x, self.fix_y(y + self._hex_side_size/2),
 
             fill=color,
             outline=edgecolor,
@@ -309,7 +309,7 @@ class HexInterface:
 
     def player_click(self, event):
         if self._game.game_state != GameState.RUNNING: return
-        i, j = self.get_coords(event.x, event.y)
+        i, j = self.get_hex_index_by_coords(event.x, event.y)
         if i < 0 or i >= self._game.size or j < 0 or j >= self._game.size: return
 
         cell_value = Cell.LOCAL if self._game.current_player_turn == self._game.local_player else Cell.REMOTE
@@ -331,14 +331,18 @@ class HexInterface:
         for i, j in winning_path:
             self.draw_hexagon(i, j, winner.color, edgecolor='black')
 
-    def get_coords(self, x, y):
+    def get_hex_index_by_coords(self, x, y):
         # y = 1.5*j*side_size
         # x = 2*i*side_root3_half + j*side_root3_half
         # j = y/(1.5*side_size)
         # i = (x-j*side_root3_half)/(side_root3_half*2)
+        y = self.fix_y(y)
         j = int(math.floor(y/(1.5*self._hex_side_size)))
         i = int(math.floor((x-j*self._hex_side_size*3**(1/2)/2)/(self._hex_side_size*3**(1/2))))
         return i, j
+
+    def fix_y(self, y):
+        return self._canvas_size_y - y
 
 if __name__ == "__main__":
     p1_name = "Player 1"
