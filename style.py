@@ -1,2 +1,3 @@
 BACKGROUND_COLOR = "white"
 WAITING_COLOR = "gray"
+UNSELECTED_BUTTON = {"bg": BACKGROUND_COLOR, "fg": "black"}
