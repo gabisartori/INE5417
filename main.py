@@ -4,6 +4,7 @@ from style import *
 import random
 import os
 from colorsys import hsv_to_rgb
+import time
 
 class GameState(Enum):
     WAITING = 0
@@ -59,9 +60,9 @@ class Game:
         return cell
 
     def check_winner(self, cell: Cell):
-        queue = [(0, b) if cell == Cell.REMOTE else (b, 0) for b in range(self.size)]
+        queue = [(0, b) if cell == Cell.REMOTE else (b, self.size-1) for b in range(self.size)]
         queue = [possible_start for possible_start in queue if self._board[possible_start[0]][possible_start[1]] == cell]
-        possible_end_cells = [(self.size-1, b) if cell == Cell.REMOTE else (b, self.size-1) for b in range(self.size)]
+        possible_end_cells = [(self.size-1, b) if cell == Cell.REMOTE else (b, 0) for b in range(self.size)]
         possible_end_cells = [possible_cell for possible_cell in possible_end_cells if self._board[possible_cell[0]][possible_cell[1]] == cell]
 
         if not queue or not possible_end_cells: return None
@@ -393,7 +394,8 @@ class HexInterface:
         if self._game.insert_cell(i, j, cell_value) == None: return
 
         freq = self.random_note(i, j)
-        os.system(f"play -nq -t alsa synth 0.1 sine {freq}")
+        sound_type = "sine"
+        os.system(f"play -nq -t alsa synth 0.1 {sound_type} {freq}")
 
         winning_path = self._game.check_winner(cell_value)
 
@@ -402,7 +404,8 @@ class HexInterface:
             self._game.game_state = GameState.ENDED
             for i, j in winning_path:
                 self.draw_hexagon(i, j, self._game.current_player_turn.color, edgecolor='black')
-                os.system(f"play -nq -t alsa synth 0.1 sine {self.random_note(i, j)}")
+                self._root.update_idletasks()
+                os.system(f"play -nq -t alsa synth 0.25 {sound_type} {self.random_note(i, j)}")
         else:
             self._game.current_player_turn = self._game.local_player if self._game.current_player_turn == self._game.remote_player else self._game.remote_player        
             self.__current_player_label.configure(text=f"Vez de {self._game.current_player_turn.name}", fg=self._game.current_player_turn.color)
@@ -411,13 +414,13 @@ class HexInterface:
         return self._canvas_size_y - y
     
     def random_note(self, i, j):
-        notes = [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88]
-        random_n = (i**7+j*8)%7
+        notes = [293.66, 293.66, 587.33, 440, 415.3, 392, 349.23, 349.23, 293.66, 349.23, 392]
+        random_n = (i+j)%len(notes)
         return notes[random_n]
 
 if __name__ == "__main__":
-    p1_name = "Player 1"
-    p2_name = "Player 2"
+    p1_name = "Player 1a"
+    p2_name = "Player 2a"
     p1_color_hue = sum([ord(c) for c in p1_name]) % 256 / 256
     p2_color_hue = (p1_color_hue + 0.5) % 1
     p1 = Player(p1_name, p1_color_hue)
