@@ -171,9 +171,9 @@ class HexInterface:
         # Math for drawing cells
         self.__canvas_padding = 15
         self._canvas_size_x = 800
-        self._hex_side_size = self._canvas_size_x / (1.5*((self._game.size)*3**(1/2)))
+        self._hex_side_size = self._canvas_size_x / (3*self._game.size-1)
         self._canvas_size_x += 2*self.__canvas_padding
-        self._canvas_size_y = 1.5*self._hex_side_size * self._game.size + self._hex_side_size/2 + 2*self.__canvas_padding
+        self._canvas_size_y = 2*self.__canvas_padding + self._game.size*self._hex_side_size*3**(1/2)
 
         # Control gamestate
         self._local_voted = False
@@ -213,13 +213,11 @@ class HexInterface:
     def update_style_player_change(self):
         if self._game.local_player != None:
             self.__local_player_label.configure(text=self._game.local_player.name, bg=BACKGROUND_COLOR, fg=self._game.local_player.color)
-            [self.draw_triangle(i, True, self._game.local_player) for i in range(self._game.size+1)]
-            [self.draw_triangle(i, False, self._game.local_player) for i in range(self._game.size+1)]
+            self.draw_borders(self._game.local_player)
         if self._game.remote_player != None:
             self.__remote_player_label.configure(text=self._game.remote_player.name, bg=BACKGROUND_COLOR, fg=self._game.remote_player.color)
             self.__current_player_label.configure(text=f"Vez de {self._game.remote_player.name}", fg=BACKGROUND_COLOR)
-            [self.draw_triangle(i, True, self._game.remote_player) for i in range(1, self._game.size)]
-            [self.draw_triangle(i, False, self._game.remote_player) for i in range(1, self._game.size)]
+            self.draw_borders(self._game.remote_player)
 
     def update_style_game_state_change(self):
         if self._game.game_state == GameState.WAITING:
@@ -264,19 +262,15 @@ class HexInterface:
 
     def draw_hexagon(self, i, j, color, edgecolor='black'):
         side_root3 = 3**(1/2)*self._hex_side_size
-        x = i*side_root3 + j*side_root3/2
-        y = 1.5*j*self._hex_side_size
-
-        x += self.__canvas_padding
-        y += self.__canvas_padding
+        x, y = self.hex_starting_point(i, j)
 
         hexagon = self.__canvas.create_polygon(
-            x + side_root3/2, self.fix_y(y),
-            x + side_root3, self.fix_y(y + self._hex_side_size/2),
-            x + side_root3, self.fix_y(y + 3*self._hex_side_size/2),
-            x + side_root3/2, self.fix_y(y + 2*self._hex_side_size),
-            x, self.fix_y(y + 3*self._hex_side_size/2),
-            x, self.fix_y(y + self._hex_side_size/2),
+            x, self.fix_y(y + side_root3/2),
+            x + 0.5*self._hex_side_size, self.fix_y(y + side_root3),
+            x + 1.5*self._hex_side_size, self.fix_y(y + side_root3),
+            x + 2.0*self._hex_side_size, self.fix_y(y + side_root3/2),
+            x + 1.5*self._hex_side_size, self.fix_y(y),
+            x + 0.5*self._hex_side_size, self.fix_y(y),
 
             fill=color,
             outline=edgecolor,
@@ -284,66 +278,73 @@ class HexInterface:
         )
         return hexagon
 
-    def draw_triangle(self, i: int, start: bool, player: Player):
+    def hex_starting_point(self, i, j):
         side_root3 = 3**(1/2)*self._hex_side_size
-        coords = []
-        if player == self._game.local_player:
-            if start: # Bottom side
-                y = self.__canvas_padding
-                x = self.__canvas_padding + i*side_root3
+        i, j = self.convert_ij(i, j)
 
-                coords.append(max(self.__canvas_padding, x - side_root3/2))
-                coords.append(self.fix_y(y))                 
+        n = self._game.size - abs(i+1-self._game.size)
 
-                coords.append(x)
-                coords.append(self.fix_y(y + self._hex_side_size/2))
+        x = i*1.5*self._hex_side_size
+        y = (self._canvas_size_y - n*side_root3)/2
 
-                coords.append(min(x + side_root3/2, self.__canvas_padding+self._game.size*side_root3))
-                coords.append(self.fix_y(y))               
-            else: # Top side
-                start_x = self.__canvas_padding + (self._game.size-1)*side_root3/2
-                x = start_x + i*side_root3
-                y = self._canvas_size_y - self.__canvas_padding
+        y += j*side_root3
+        x += self.__canvas_padding
 
-                coords.append(max(start_x, x - side_root3/2))
-                coords.append(self.fix_y(y))
+        return x, y
 
-                coords.append(x)
-                coords.append(self.fix_y(y - self._hex_side_size/2))
+    def convert_ij(self, i, j):
+        m = [[(x, y) for y in range(self._game.size)] for x in range(self._game.size)]
+        tilt = []
 
-                coords.append(min(x + side_root3/2, start_x + self._game.size*side_root3))
-                coords.append(self.fix_y(y))
-        else:
-            if start: # Left side
-                x = self.__canvas_padding + i*side_root3/2
-                y = self.__canvas_padding + i*1.5*self._hex_side_size + self._hex_side_size/2
+        for x in range(self._game.size):
+            tilt.append([m[i-x][self._game.size-i-1] for i in range(self._game.size) if i>=x])
+            tilt.append([m[i][self._game.size-i+x-1] for i in range(self._game.size) if i>=x])        
+        tilt = sorted(tilt[1:])
+        for x, diagonal in enumerate(tilt):
+            for y, cell in enumerate(diagonal):
+                if cell == (i, j):
+                    return x, y
+        return -1, -1
 
-                coords.append(x - side_root3/2)
-                coords.append(self.fix_y(y - self._hex_side_size/2))
-
-                coords.append(x)
-                coords.append(self.fix_y(y))
-
-                coords.append(x)
-                coords.append(self.fix_y(y + self._hex_side_size))
-            else: # Right side
-                start_x = self.__canvas_padding + (self._game.size)*side_root3
-                x = start_x + (i-1)*side_root3/2
-                y = self.__canvas_padding + i*1.5*self._hex_side_size
-
-                coords.append(x)
-                coords.append(self.fix_y(y))
-
-                coords.append(x)
-                coords.append(self.fix_y(y - self._hex_side_size))
-
-                coords.append(x + side_root3/2)
-                coords.append(self.fix_y(y + self._hex_side_size/2))
-
-        self.__canvas.create_polygon(
-            *coords,
-            fill=player.color,
+    def draw_borders(self, player: Player):
+        side_root3 = 3**(1/2)*self._hex_side_size
+        start_coords = (
+            self.hex_starting_point(0, 0),
+            self.hex_starting_point(0, self._game.size-1),
+            self.hex_starting_point(self._game.size-1, 0),
+            self.hex_starting_point(self._game.size-1, self._game.size-1)
         )
+                
+        offsets = (
+            (-self._hex_side_size, side_root3/2),
+            (self._hex_side_size, -side_root3*1/6),
+            (1*self._hex_side_size, side_root3*7/6),
+            (3*self._hex_side_size, side_root3/2)
+        )
+        coords = [
+            [x+y for x, y in zip(start_coords[0], offsets[0])],
+            [x+y for x, y in zip(start_coords[1], offsets[1])],
+            [x+y for x, y in zip(start_coords[2], offsets[2])],
+            [x+y for x, y in zip(start_coords[3], offsets[3])]
+        ]
+
+        if player == self._game.local_player:
+            self.__canvas.create_polygon(
+                *(coords[0]),
+                *(coords[1]),
+                *(coords[2]),
+                *(coords[3]),
+                fill=player.color
+            )
+        else:
+            self.__canvas.create_polygon(
+                *(coords[1]),
+                *(coords[3]),
+                *(coords[0]),
+                *(coords[2]),
+                fill=player.color
+            )
+        self.__canvas.tag_raise("hexagon")
 
     def player_press_action_button(self, player: Player):
         if player == None:
@@ -413,6 +414,8 @@ if __name__ == "__main__":
     p2 = Player(p2_name, p2_color_hue)
 
     hex_interface = HexInterface()
-    hex_interface._root.after(2000, lambda: hex_interface.add_player(p1))
-    hex_interface._root.after(5000, lambda: hex_interface.add_player(p2))
+    # hex_interface._root.after(2000, lambda: hex_interface.add_player(p1))
+    # hex_interface._root.after(5000, lambda: hex_interface.add_player(p2))
+    hex_interface.add_player(p1)
+    hex_interface.add_player(p2)
     hex_interface._root.mainloop()
