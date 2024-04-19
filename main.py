@@ -2,7 +2,7 @@ from enum import Enum
 import tkinter as tk
 from style import *
 import random
-import math
+import os
 from colorsys import hsv_to_rgb
 
 class GameState(Enum):
@@ -392,18 +392,28 @@ class HexInterface:
         cell_value = Cell.LOCAL if self._game.current_player_turn == self._game.local_player else Cell.REMOTE
         if self._game.insert_cell(i, j, cell_value) == None: return
 
+        freq = self.random_note(i, j)
+        os.system(f"play -nq -t alsa synth 0.1 sine {freq}")
+
         winning_path = self._game.check_winner(cell_value)
 
         if winning_path:
             self.__game_title.configure(text=f"{self._game.current_player_turn.name} venceu!")
             self._game.game_state = GameState.ENDED
-            [self.draw_hexagon(i, j, self._game.current_player_turn.color, edgecolor='black') for i, j in winning_path]
+            for i, j in winning_path:
+                self.draw_hexagon(i, j, self._game.current_player_turn.color, edgecolor='black')
+                os.system(f"play -nq -t alsa synth 0.1 sine {self.random_note(i, j)}")
         else:
             self._game.current_player_turn = self._game.local_player if self._game.current_player_turn == self._game.remote_player else self._game.remote_player        
             self.__current_player_label.configure(text=f"Vez de {self._game.current_player_turn.name}", fg=self._game.current_player_turn.color)
 
     def fix_y(self, y):
         return self._canvas_size_y - y
+    
+    def random_note(self, i, j):
+        notes = [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88]
+        random_n = (i**7+j*8)%7
+        return notes[random_n]
 
 if __name__ == "__main__":
     p1_name = "Player 1"
