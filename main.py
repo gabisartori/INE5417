@@ -253,7 +253,7 @@ class HexInterface(DogPlayerInterface):
             for i in range(self._game.size):
                 for j in range(self._game.size):
                     hexagon = self.draw_hexagon(i, j, BACKGROUND_COLOR)
-                    self.__canvas.tag_bind(hexagon, "<Button-1>", lambda e, i=i, j=j: self.hex_clicked(i, j))
+                    self.__canvas.tag_bind(hexagon, "<Button-1>", lambda e, i=i, j=j: self.choose_cell(i, j))
                     self.__canvas.tag_bind(hexagon, "<Enter>", lambda e, hexagon=hexagon: handle_mouse_move(hexagon, False))
                     self.__canvas.tag_bind(hexagon, "<Leave>", lambda e, hexagon=hexagon: handle_mouse_move(hexagon, True))
 
@@ -411,7 +411,7 @@ class HexInterface(DogPlayerInterface):
         self.__game_title.configure(text="Hex")
         self._game.restart()
 
-    def hex_clicked(self, i, j):
+    def choose_cell(self, i, j):
         if self._game.game_state != GameState.RUNNING: return
         if self._game.current_player_turn != self._game.local_player: return
 
@@ -419,12 +419,29 @@ class HexInterface(DogPlayerInterface):
 
         winning_path = self._game.check_winner(Cell.LOCAL)
 
+        move = {'match_status': 'next'}
+        move['marked_cell'] = (i, j)
         if winning_path:
             self.__notification.configure(text=f"{self._game.current_player_turn.name} venceu!")
             self._game.game_state = GameState.ENDED
             [self.draw_hexagon(i, j, self._game.current_player_turn.color, edgecolor='black') for i, j in winning_path]
+            move['match_status'] = 'finished'
+            move['winning_path'] = winning_path
         else:
             self._game.current_player_turn = self._game.local_player if self._game.current_player_turn == self._game.remote_player else self._game.remote_player        
+
+        self.dog_server_interface.send_move(move)
+
+    def receive_move(self, a_move):
+        if a_move['match_status'] == 'finished':
+            self.__notification.configure(text=f"{self._game.remote_player.name} venceu!")
+            winning_path = a_move['winning_path']
+            [self.draw_hexagon(i, j, self._game.remote_player.color, edgecolor='black') for i, j in winning_path]
+            self._game.game_state = GameState.ENDED
+        else:
+            i, j = a_move['marked_cell']
+            self._game.insert_cell(i, j, Cell.REMOTE)
+            self._game.current_player_turn = self._game.local_player if self._game.current_player_turn == self._game.remote_player else self._game.remote_player
 
     def fix_y(self, y):
         return self._canvas_size_y - y
