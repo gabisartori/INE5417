@@ -1,5 +1,6 @@
 from enum import Enum
 import tkinter as tk
+from tkinter import simpledialog
 from style import *
 import random
 import math
@@ -162,12 +163,10 @@ class Game:
     @local_player.setter
     def local_player(self, player: Player) -> None:
         self._local_player = player
-        self._screen.update_style_player_change()
 
     @remote_player.setter
     def remote_player(self, player: Player) -> None:
         self._remote_player = player
-        self._screen.update_style_player_change()
 
     @current_player_turn.setter
     def current_player_turn(self, player: Player) -> None:
@@ -195,9 +194,6 @@ class HexInterface(DogPlayerInterface):
         self._canvas_size_x += 2*self.__canvas_padding
         self._canvas_size_y = 2*self.__canvas_padding + self._game.size*self._hex_side_size*3**(1/2)
 
-        # Control gamestate
-        self._action_button_pressed = False
-
         ### Screen components
         # Game title
         self.__title_frame = tk.Frame(self._root, bg=BACKGROUND_COLOR)
@@ -223,7 +219,7 @@ class HexInterface(DogPlayerInterface):
         self.update_style_game_state_change()
 
         # DOG setup
-        self._game.local_player = Player(["Player 1", "Player 2"][random.randint(0, 1)])
+        self._game.local_player = Player(simpledialog.askstring(title="Apelido de jogador", prompt="Qual o seu nome?"))
         self.dog_server_interface = DogActor()
         print(self.dog_server_interface.initialize(self._game.local_player.name, self))
 
@@ -239,7 +235,7 @@ class HexInterface(DogPlayerInterface):
             self.draw_borders(self._game.local_player)
         if self._game.remote_player != None:
             self.__remote_player_label.configure(text=self._game.remote_player.name, bg=BACKGROUND_COLOR, fg=self._game.remote_player.color)
-            self.__current_player_label.configure(text=f"Vez de {self._game.remote_player.name}", fg=BACKGROUND_COLOR)
+            self.__current_player_label.configure(text=f"Vez de {self._game.current_player_turn.name}", fg=BACKGROUND_COLOR)
             self.draw_borders(self._game.remote_player)
 
     def update_style_game_state_change(self):
@@ -248,9 +244,11 @@ class HexInterface(DogPlayerInterface):
             # Set canvas background color and bind mouse events to empty hexagons
             def handle_mouse_int(hexagon):
                 if self._game.game_state != GameState.RUNNING: return
+                if self._game.current_player_turn != self._game.local_player: return
                 self.__canvas.itemconfig(hexagon, fill=self._game.current_player_turn.piece_color)
             def handle_mouse_out(hexagon):
                 if self._game.game_state != GameState.RUNNING: return
+                if self._game.current_player_turn != self._game.local_player: return
                 self.__canvas.itemconfig(hexagon, fill=BACKGROUND_COLOR)
 
             self.__canvas.delete("hexagon")
@@ -262,8 +260,6 @@ class HexInterface(DogPlayerInterface):
                     self.__canvas.tag_bind(hexagon, "<Leave>", lambda e, hexagon=hexagon: handle_mouse_out(hexagon))
         else:
             self.local_player_action_button.configure(text="Restart")
-
-        self.local_player_action_button.configure(**{"bg": self._game.local_player.color, "fg": BACKGROUND_COLOR} if self._action_button_pressed else UNSELECTED_BUTTON)
 
     def game_screen(self):
         '''Draws the game screen with the game title, player labels and action buttons, and the canvas for the game board.'''
@@ -366,7 +362,6 @@ class HexInterface(DogPlayerInterface):
         self.__canvas.tag_raise("hexagon")
 
     def player_press_action_button(self, player: Player):
-        self._action_button_pressed = not self._action_button_pressed
         self.update_style_game_state_change()
         
         if self._game.game_state == GameState.WAITING:
@@ -386,12 +381,13 @@ class HexInterface(DogPlayerInterface):
         # If match started, get players name and instantiate them
         self.start_game(start_status)
 
-    def start_game(self, start_status: StartStatus):
+    def start_game(self, start_status: StartStatus, received=False):
         players = start_status.get_players()
         if len(players) != 2: return
         p1, p2 = players
         p1_name, p2_name = p1[0], p2[0]
         p1_hue, p2_hue = self.calculate_player_colors(p1_name, p2_name)
+        if received: p1_hue, p2_hue = p2_hue, p1_hue
 
         self._game.local_player.hue = p1_hue
         self._game.remote_player = Player(p2_name, p2_hue)
@@ -399,8 +395,7 @@ class HexInterface(DogPlayerInterface):
         self._game.game_state = GameState.RUNNING
         my_turn = (str(p1[2]) == "1") ^ (p1[1] == start_status.get_local_id())
         self._game.current_player_turn = self._game.local_player if my_turn else self._game.remote_player
-        self._action_button_pressed = False
-
+        self.update_style_player_change()
         self.__current_player_label.configure(text=f"Vez de {self._game.current_player_turn.name}", fg=self._game.current_player_turn.color)
         self.local_player_action_button.configure(bg="white", text="Restart", fg='black')
 
@@ -408,10 +403,9 @@ class HexInterface(DogPlayerInterface):
         if start_status.get_code() == 0 or start_status.get_code() == 1:
             print(start_status.get_message())
             return
-        self.start_game(start_status)
+        self.start_game(start_status, True)
 
     def restart_game(self):
-        self._action_button_pressed = False
         self.__game_title.configure(text="Hex")
         self._game.restart()
 
@@ -423,12 +417,11 @@ class HexInterface(DogPlayerInterface):
 
     def hex_clicked(self, i, j):
         if self._game.game_state != GameState.RUNNING: return
-        # if i < 0 or i >= self._game.size or j < 0 or j >= self._game.size: return
+        if self._game.current_player_turn != self._game.local_player: return
 
-        cell_value = Cell.LOCAL if self._game.current_player_turn == self._game.local_player else Cell.REMOTE
-        if self._game.insert_cell(i, j, cell_value) == None: return
+        if self._game.insert_cell(i, j, Cell.LOCAL) == None: return
 
-        winning_path = self._game.check_winner(cell_value)
+        winning_path = self._game.check_winner(Cell.LOCAL)
 
         if winning_path:
             self.__game_title.configure(text=f"{self._game.current_player_turn.name} venceu!")
@@ -443,7 +436,7 @@ class HexInterface(DogPlayerInterface):
 
     @staticmethod
     def calculate_player_colors(p1_name, p2_name):
-        p1_color_hue = sum([ord(c) for c in p1_name]) % 256 / 256
+        p1_color_hue = sum([ord(c) for c in p1_name+p2_name]) % 256 / 256
         p2_color_hue = (p1_color_hue + 0.5) % 1
         return p1_color_hue, p2_color_hue
 
