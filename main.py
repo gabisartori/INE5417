@@ -16,8 +16,8 @@ class GameState(Enum):
 
 class Cell(Enum):
     EMPTY = 0
-    LOCAL = 1
-    REMOTE = 2
+    P1 = 1
+    P2 = 2
 
 class Player:
     def __init__(self, name, hue=-1) -> None:
@@ -68,24 +68,30 @@ class Game:
     def __init__(self, screen: 'HexInterface', size=11) -> None:
         self._size = size
         self._board = [[Cell.EMPTY for _ in range(size)] for _ in range(size)]
+        self._player1 = None
+        self._player2 = None
         self._local_player = None
-        self._remote_player = None
         self._current_player_turn = None
         self._game_state = GameState.WAITING
         self._screen = screen
 
-    def insert_cell(self, i, j, cell: Cell):
+    def insert_cell(self, i, j):
         if self._board[i][j] != Cell.EMPTY: return None
+        cell = Cell.P1 if self.current_player_turn == self.player1 else Cell.P2
         self._board[i][j] = cell
         self._screen.draw_hexagon(i, j, self.current_player_turn.piece_color)
         return cell
 
-    def check_winner(self, cell: Cell):
-        queue = [(0, b) if cell == Cell.REMOTE else (b, 0) for b in range(self.size)]
+    def check_winner(self):
+        cell = Cell.P1 if self.current_player_turn == self.player1 else Cell.P2
+        queue = [(0, b) if cell == Cell.P2 else (b, 0) for b in range(self.size)]
+        possible_end_cells = [(self.size-1, b) if cell == Cell.P2 else (b, self.size-1) for b in range(self.size)]
+        print(queue)
+        print(possible_end_cells)
         queue = [possible_start for possible_start in queue if self._board[possible_start[0]][possible_start[1]] == cell]
-        possible_end_cells = [(self.size-1, b) if cell == Cell.REMOTE else (b, self.size-1) for b in range(self.size)]
         possible_end_cells = [possible_cell for possible_cell in possible_end_cells if self._board[possible_cell[0]][possible_cell[1]] == cell]
-
+        print(queue)
+        print(possible_end_cells)
         if not queue or not possible_end_cells: return None
 
         current_cell = None
@@ -135,12 +141,16 @@ class Game:
         return self._board
     
     @property
-    def local_player(self) -> Player:
-        return self._local_player
+    def player1(self) -> Player:
+        return self._player1
 
     @property
-    def remote_player(self) -> Player:
-        return self._remote_player
+    def player2(self) -> Player:
+        return self._player2
+    
+    @property
+    def local_player(self) -> Player:
+        return self._local_player
 
     @property
     def current_player_turn(self) -> Player | None:
@@ -158,14 +168,19 @@ class Game:
     def board(self, board: list[list[Cell]]) -> None:
         self._board = board
     
+    @player1.setter
+    def player1(self, player: Player) -> None:
+        self._player1 = player
+        self._screen.update_style_player_change()
+
+    @player2.setter
+    def player2(self, player: Player) -> None:
+        self._player2 = player
+        self._screen.update_style_player_change()
+
     @local_player.setter
     def local_player(self, player: Player) -> None:
         self._local_player = player
-        self._screen.update_style_player_change()
-
-    @remote_player.setter
-    def remote_player(self, player: Player) -> None:
-        self._remote_player = player
         self._screen.update_style_player_change()
 
     @current_player_turn.setter
@@ -221,18 +236,18 @@ class HexInterface(DogPlayerInterface):
         self.update_style_game_state_change()
 
         # Register local player and conect to DOG
-        self._game.local_player = Player(simpledialog.askstring(title="Apelido de jogador", prompt="Qual o seu nome?"))
+        self._game.player1 = Player(simpledialog.askstring(title="Apelido de jogador", prompt="Qual o seu nome?"))
         self.dog_server_interface = DogActor()
-        dog_connection_message = self.dog_server_interface.initialize(self._game.local_player.name, self)
+        dog_connection_message = self.dog_server_interface.initialize(self._game.player1.name, self)
         self.__notification.configure(text=dog_connection_message)
 
     def update_style_player_change(self):
-        if self._game.local_player != None:
-            self.__local_player_label.configure(text=self._game.local_player.name, bg=BACKGROUND_COLOR, fg=self._game.local_player.color)
+        if self._game.player1 != None:
+            self.__local_player_label.configure(text=self._game.player1.name, bg=BACKGROUND_COLOR, fg=self._game.player1.color)
         else:
             self.__local_player_label.configure(text="Esperando", bg=BACKGROUND_COLOR)
-        if self._game.remote_player != None:
-            self.__remote_player_label.configure(text=self._game.remote_player.name, bg=BACKGROUND_COLOR, fg=self._game.remote_player.color)
+        if self._game.player2 != None:
+            self.__remote_player_label.configure(text=self._game.player2.name, bg=BACKGROUND_COLOR, fg=self._game.player2.color)
         else:
             self.__remote_player_label.configure(text="Esperando", bg=BACKGROUND_COLOR)
         if self._game.current_player_turn != None:
@@ -258,8 +273,8 @@ class HexInterface(DogPlayerInterface):
                     self.__canvas.tag_bind(hexagon, "<Leave>", lambda e, hexagon=hexagon: handle_mouse_move(hexagon, True))
 
         elif self._game.game_state == GameState.RUNNING:
-            self.draw_borders(self._game.local_player)
-            self.draw_borders(self._game.remote_player)
+            self.draw_borders(self._game.player1)
+            self.draw_borders(self._game.player2)
             self.__action_button.configure(text="Desistir")
 
         else:
@@ -352,7 +367,7 @@ class HexInterface(DogPlayerInterface):
             [x+y for x, y in zip(start_coords[3], offsets[3])]
         ]
 
-        if player == self._game.local_player:
+        if player == self._game.player1:
             self.__canvas.create_polygon(
                 *(coords[0]),
                 *(coords[1]),
@@ -396,16 +411,17 @@ class HexInterface(DogPlayerInterface):
             return
 
         p1, p2 = players
+        if received: p1, p2 = p2, p1
         p1_name, p2_name = p1[0], p2[0]
         p1_hue, p2_hue = self.calculate_player_colors(p1_name, p2_name)
-        if received: p1_hue, p2_hue = p2_hue, p1_hue  # Makes the colors consistent for both players
 
-        self._game.local_player.hue = p1_hue
-        self._game.remote_player = Player(p2_name, p2_hue)
+        self._game.player1 = Player(p1_name, p1_hue)
+        self._game.player2 = Player(p2_name, p2_hue)
+        self._game.local_player = self._game.player2 if received else self._game.player1
 
         self._game.game_state = GameState.RUNNING
-        my_turn = (str(p1[2]) == "1") ^ (p1[1] == start_status.get_local_id())
-        self._game.current_player_turn = self._game.local_player if my_turn else self._game.remote_player
+        p1_turn = (str(p1[2]) == "1")
+        self._game.current_player_turn = self._game.player1 if p1_turn else self._game.player2
 
     def restart_game(self):
         self.__game_title.configure(text="Hex")
@@ -415,9 +431,9 @@ class HexInterface(DogPlayerInterface):
         if self._game.game_state != GameState.RUNNING: return
         if self._game.current_player_turn != self._game.local_player: return
 
-        if self._game.insert_cell(i, j, Cell.LOCAL) == None: return
+        if self._game.insert_cell(i, j) == None: return
 
-        winning_path = self._game.check_winner(Cell.LOCAL)
+        winning_path = self._game.check_winner()
 
         move = {'match_status': 'next'}
         move['marked_cell'] = (i, j)
@@ -428,20 +444,20 @@ class HexInterface(DogPlayerInterface):
             move['match_status'] = 'finished'
             move['winning_path'] = winning_path
         else:
-            self._game.current_player_turn = self._game.local_player if self._game.current_player_turn == self._game.remote_player else self._game.remote_player        
+            self._game.current_player_turn = self._game.player1 if self._game.current_player_turn == self._game.player2 else self._game.player2        
 
         self.dog_server_interface.send_move(move)
 
     def receive_move(self, a_move):
         if a_move['match_status'] == 'finished':
-            self.__notification.configure(text=f"{self._game.remote_player.name} venceu!")
+            self.__notification.configure(text=f"{self._game.player2.name} venceu!")
             winning_path = a_move['winning_path']
-            [self.draw_hexagon(i, j, self._game.remote_player.color, edgecolor='black') for i, j in winning_path]
+            [self.draw_hexagon(i, j, self._game.current_player_turn.color, edgecolor='black') for i, j in winning_path]
             self._game.game_state = GameState.ENDED
         else:
             i, j = a_move['marked_cell']
-            self._game.insert_cell(i, j, Cell.REMOTE)
-            self._game.current_player_turn = self._game.local_player if self._game.current_player_turn == self._game.remote_player else self._game.remote_player
+            self._game.insert_cell(i, j)
+            self._game.current_player_turn = self._game.player1 if self._game.current_player_turn == self._game.player2 else self._game.player2
 
     def fix_y(self, y):
         return self._canvas_size_y - y
