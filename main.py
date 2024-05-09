@@ -472,8 +472,9 @@ class HexInterface(DogPlayerInterface):
             self.game.switch_player_turn()
 
     # ReceiveLeave
-    def receive_leave(self):
-        pass
+    def receive_withdrawal_notification(self):
+        self.__notification_label.configure(text="O oponente desistiu!")
+        self.game.game_state = GameState.ENDED
 
     # Auxiliars
     @staticmethod
