@@ -2,8 +2,6 @@ from enum import Enum
 import tkinter as tk
 from tkinter import simpledialog
 from style import *
-import random
-import math
 from colorsys import hsv_to_rgb
 from dog.dog_interface import DogPlayerInterface
 from dog.dog_actor import DogActor
@@ -191,6 +189,7 @@ class Game:
         self._screen.update_style_game_state_change()
 
 class HexInterface(DogPlayerInterface):
+    # Initialize
     def __init__(self) -> None:
         # DogPlayerInterface
         self._dog_server_interface = DogActor()
@@ -228,14 +227,6 @@ class HexInterface(DogPlayerInterface):
         self.game.player1 = Player(simpledialog.askstring(title="Apelido de jogador", prompt="Qual o seu nome?"))
         dog_connection_message = self._dog_server_interface.initialize(self.game.player1.name, self)
         self.__notification_label.configure(text=dog_connection_message)
-
-    @property
-    def root(self):
-        return self._root
-    
-    @property
-    def game(self):
-        return self._game
 
     def update_style_player_change(self):
         if self.game.player1 != None:
@@ -307,6 +298,7 @@ class HexInterface(DogPlayerInterface):
         # Board
         self.__canvas.grid(row=2, column=1, padx=10, pady=10)
 
+    # Draw Board
     def draw_hexagon(self, i, j, color, edgecolor=HEXAGON_BORDER_COLOR):
         side_root3 = 3**(1/2)*self._hex_side_size
         x, y = self.hex_starting_point(i, j)
@@ -396,6 +388,10 @@ class HexInterface(DogPlayerInterface):
             )
         self.__canvas.tag_raise("hexagon")
 
+    def fix_y(self, y):
+        return self._canvas_size_y - y
+
+    # StartMatch
     def player_press_action_button(self):
         if self.game.game_state == GameState.WAITING: self.start_match()
         elif self.game.game_state == GameState.RUNNING: self.root.quit()
@@ -406,10 +402,12 @@ class HexInterface(DogPlayerInterface):
         if start_status.get_code() in '01': self.__notification_label.configure(text=start_status.get_message())
         else: self.start_game(start_status)
 
+    # ReceiveStart
     def receive_start(self, start_status: StartStatus) -> None:
         if start_status.get_code() == 0 or start_status.get_code() == 1: print(start_status.get_message())
         else: self.start_game(start_status, True)
 
+    # StartGame
     def start_game(self, start_status: StartStatus, received=False):
         '''Sets things up for when a match starts, depending on who started it.'''
         self.restart_game()
@@ -439,6 +437,7 @@ class HexInterface(DogPlayerInterface):
         self.__notification_label.configure(text="")
         self.game.restart()
 
+    # ChooseCell
     def choose_cell(self, i, j):
         if self.game.game_state != GameState.RUNNING: return
         if self.game.current_player_turn != self.game.local_player: return
@@ -460,6 +459,7 @@ class HexInterface(DogPlayerInterface):
 
         self._dog_server_interface.send_move(move)
 
+    # ReceiveMove
     def receive_move(self, a_move):
         if a_move['match_status'] == 'finished':
             self.__notification_label.configure(text=f"{self.game.current_player_turn.name} venceu!")
@@ -471,15 +471,24 @@ class HexInterface(DogPlayerInterface):
             self.game.insert_cell(i, j)
             self.game.switch_player_turn()
 
-    def fix_y(self, y):
-        return self._canvas_size_y - y
+    # ReceiveLeave
+    def receive_leave(self):
+        pass
 
+    # Auxiliars
     @staticmethod
     def calculate_player_colors(p1_name, p2_name):
         p1_color_hue = sum([ord(c) for c in p1_name+p2_name]) % 256 / 256
         p2_color_hue = (p1_color_hue + 0.5) % 1
         return p1_color_hue, p2_color_hue
 
-if __name__ == "__main__":
-    hex_interface = HexInterface()
-    hex_interface.root.mainloop()
+    @property
+    def root(self):
+        return self._root
+    
+    @property
+    def game(self):
+        return self._game
+
+
+if __name__ == "__main__": hex_interface = HexInterface().root.mainloop()
