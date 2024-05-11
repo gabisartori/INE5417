@@ -1,11 +1,13 @@
 from enum import Enum
 import tkinter as tk
 from tkinter import simpledialog
-from style import *
+from themes import *
 from colorsys import hsv_to_rgb
 from dog.dog_interface import DogPlayerInterface
 from dog.dog_actor import DogActor
 from dog.start_status import StartStatus
+
+theme = Theme()
 
 class GameState(Enum):
     WAITING = 0
@@ -24,8 +26,8 @@ class Player:
         self._color, self._piece_color = self.calculate_colors()
 
     def calculate_colors(self) -> tuple[str, str]:
-        if self._hue == -1: return TEXT_COLOR, TEXT_COLOR
-        r1, g1, b1 = [hex(int(c*255))[2:] for c in hsv_to_rgb(self._hue, *COLOR_BRIGHTNESS)]
+        if self._hue == -1: return theme.TEXT_COLOR, theme.TEXT_COLOR
+        r1, g1, b1 = [hex(int(c*255))[2:] for c in hsv_to_rgb(self._hue, *theme.COLOR_BRIGHTNESS)]
         if len(r1) == 1: r1 = '0' + r1
         if len(g1) == 1: g1 = '0' + g1
         if len(b1) == 1: b1 = '0' + b1
@@ -63,7 +65,7 @@ class Player:
         self._color, self._piece_color = self.calculate_colors()
 
 class Game:
-    def __init__(self, screen: 'HexInterface', size=11) -> None:
+    def __init__(self, screen: 'HexInterface', size: int) -> None:
         self._size = size
         self._screen = screen
         self._local_player = None
@@ -196,14 +198,7 @@ class HexInterface(DogPlayerInterface):
 
         # Screen and game info
         self._root = tk.Tk()
-        self._game = Game(self)
-
-        # Math for drawing cells
-        self.__canvas_padding = CANVAS_PADDING
-        self._canvas_size_x = CANVAS_SIZE_X
-        self._hex_side_size = self._canvas_size_x / (3*self.game.size-1)
-        self._canvas_size_x += 2*self.__canvas_padding
-        self._canvas_size_y = 2*self.__canvas_padding + self.game.size*self._hex_side_size*3**(1/2)
+        self._game = Game(self, theme.GAME_SIZE)
 
         ### Screen components
         # Labels
@@ -217,7 +212,7 @@ class HexInterface(DogPlayerInterface):
         self.__action_button = tk.Button(command=self.player_press_action_button)
 
         # Canva
-        self.__canvas = tk.Canvas(self.root, width=self._canvas_size_x, height=self._canvas_size_y)
+        self.__canvas = tk.Canvas(self.root, width=theme.CANVAS_SIZE_X, height=theme.CANVAS_SIZE_Y)
 
         # Initialize screen
         self.build_screen()
@@ -232,13 +227,13 @@ class HexInterface(DogPlayerInterface):
         if self.game.player1 != None:
             self.__player1_label.configure(text=self.game.player1.name, fg=self.game.player1.color)
         elif self.game.local_player != None:
-            self.__player1_label.configure(text=self.game.local_player.name, fg=TEXT_COLOR)
+            self.__player1_label.configure(text=self.game.local_player.name, fg=theme.TEXT_COLOR)
         else:
-            self.__player1_label.configure(text="Esperando", fg=TEXT_COLOR)
+            self.__player1_label.configure(text="Esperando", fg=theme.TEXT_COLOR)
         if self.game.player2 != None:
             self.__player2_label.configure(text=self.game.player2.name, fg=self.game.player2.color)
         else:
-            self.__player2_label.configure(text="Esperando", fg=TEXT_COLOR)
+            self.__player2_label.configure(text="Esperando", fg=theme.TEXT_COLOR)
         if self.game.current_player_turn != None:
             self.__current_player_label.configure(text=f"Vez de {self.game.current_player_turn.name}", fg=self.game.current_player_turn.color)
         else:
@@ -251,12 +246,12 @@ class HexInterface(DogPlayerInterface):
             def handle_mouse_move(hexagon, out):
                 if self.game.game_state != GameState.RUNNING: return
                 if self.game.current_player_turn != self.game.local_player: return
-                self.__canvas.itemconfig(hexagon, fill=BACKGROUND_COLOR if out else self.game.current_player_turn.piece_color)
+                self.__canvas.itemconfig(hexagon, fill=theme.BACKGROUND_COLOR if out else self.game.current_player_turn.piece_color)
 
             self.__canvas.delete("all")
             for i in range(self.game.size):
                 for j in range(self.game.size):
-                    hexagon = self.draw_hexagon(i, j, BACKGROUND_COLOR)
+                    hexagon = self.draw_hexagon(i, j, theme.BACKGROUND_COLOR)
                     self.__canvas.tag_bind(hexagon, "<Button-1>", lambda e, i=i, j=j: self.choose_cell(i, j))
                     self.__canvas.tag_bind(hexagon, "<Enter>", lambda e, hexagon=hexagon: handle_mouse_move(hexagon, False))
                     self.__canvas.tag_bind(hexagon, "<Leave>", lambda e, hexagon=hexagon: handle_mouse_move(hexagon, True))
@@ -276,14 +271,14 @@ class HexInterface(DogPlayerInterface):
         self.root.iconphoto(False, tk.PhotoImage(file='assets/logo.png'))
 
         # Styling
-        self.root.configure(bg=BACKGROUND_COLOR)
-        self.__game_title_label.configure(bg=BACKGROUND_COLOR, fg=TEXT_COLOR, font=("Helvetica", 24), pady=30)
-        self.__notification_label.configure(bg=BACKGROUND_COLOR, fg=TEXT_COLOR)
-        self.__player1_label.configure(bg=BACKGROUND_COLOR, fg=TEXT_COLOR)
-        self.__player2_label.configure(bg=BACKGROUND_COLOR, fg=TEXT_COLOR)
-        self.__current_player_label.configure(bg=BACKGROUND_COLOR, fg=TEXT_COLOR)
-        self.__action_button.configure(bg=BUTTON_COLOR, fg=BACKGROUND_COLOR)
-        self.__canvas.configure(bg=BACKGROUND_COLOR, highlightthickness=0)
+        self.root.configure(bg=theme.BACKGROUND_COLOR)
+        self.__game_title_label.configure(bg=theme.BACKGROUND_COLOR, fg=theme.TEXT_COLOR, font=("Helvetica", 24), pady=30)
+        self.__notification_label.configure(bg=theme.BACKGROUND_COLOR, fg=theme.TEXT_COLOR)
+        self.__player1_label.configure(bg=theme.BACKGROUND_COLOR, fg=theme.TEXT_COLOR)
+        self.__player2_label.configure(bg=theme.BACKGROUND_COLOR, fg=theme.TEXT_COLOR)
+        self.__current_player_label.configure(bg=theme.BACKGROUND_COLOR, fg=theme.TEXT_COLOR)
+        self.__action_button.configure(**theme.DEFAULT_BUTTON)
+        self.__canvas.configure(bg=theme.BACKGROUND_COLOR, highlightthickness=0)
 
         # Layout
         self.__game_title_label.grid(row=0, column=1)
@@ -299,19 +294,18 @@ class HexInterface(DogPlayerInterface):
         self.__canvas.grid(row=2, column=1, padx=10, pady=10)
 
     # Draw Board
-    def draw_hexagon(self, i, j, color, edgecolor=HEXAGON_BORDER_COLOR):
-        side_root3 = 3**(1/2)*self._hex_side_size
+    def draw_hexagon(self, i, j, color, edgecolor=theme.HEXAGON_BORDER_COLOR):
         x, y = self.hex_starting_point(i, j)
 
         hexagon = self.__canvas.create_polygon(
-            x, self.fix_y(y + side_root3/2),
-            x + 0.5*self._hex_side_size, self.fix_y(y + side_root3),
-            x + 1.5*self._hex_side_size, self.fix_y(y + side_root3),
-            x + 2.0*self._hex_side_size, self.fix_y(y + side_root3/2),
-            x + 1.5*self._hex_side_size, self.fix_y(y),
-            x + 0.5*self._hex_side_size, self.fix_y(y),
+            x, self.fix_y(y + theme.HEX_SIDE_SIZE_ROOT_3/2),
+            x + 0.5*theme.HEX_SIDE_SIZE, self.fix_y(y + theme.HEX_SIDE_SIZE_ROOT_3),
+            x + 1.5*theme.HEX_SIDE_SIZE, self.fix_y(y + theme.HEX_SIDE_SIZE_ROOT_3),
+            x + 2.0*theme.HEX_SIDE_SIZE, self.fix_y(y + theme.HEX_SIDE_SIZE_ROOT_3/2),
+            x + 1.5*theme.HEX_SIDE_SIZE, self.fix_y(y),
+            x + 0.5*theme.HEX_SIDE_SIZE, self.fix_y(y),
 
-            width=HEXAGON_BORDER_WIDTH,
+            width=theme.HEXAGON_BORDER_WIDTH,
             fill=color,
             outline=edgecolor,
             tags="hexagon"
@@ -319,16 +313,15 @@ class HexInterface(DogPlayerInterface):
         return hexagon
 
     def hex_starting_point(self, i, j):
-        side_root3 = 3**(1/2)*self._hex_side_size
         i, j = self.convert_ij(i, j)
 
         n = self.game.size - abs(i+1-self.game.size)
 
-        x = i*1.5*self._hex_side_size
-        y = (self._canvas_size_y - n*side_root3)/2
+        x = i*1.5*theme.HEX_SIDE_SIZE
+        y = (theme.CANVAS_SIZE_Y - n*theme.HEX_SIDE_SIZE_ROOT_3)/2
 
-        y += j*side_root3
-        x += self.__canvas_padding
+        y += j*theme.HEX_SIDE_SIZE_ROOT_3
+        x += theme.CANVAS_PADDING
 
         return x, y
 
@@ -347,7 +340,6 @@ class HexInterface(DogPlayerInterface):
         return -1, -1
 
     def draw_borders(self, player: Player):
-        side_root3 = 3**(1/2)*self._hex_side_size
         start_coords = (
             self.hex_starting_point(0, 0),
             self.hex_starting_point(0, self.game.size-1),
@@ -356,10 +348,10 @@ class HexInterface(DogPlayerInterface):
         )
                 
         offsets = (
-            (-self._hex_side_size, side_root3/2),
-            (self._hex_side_size, -side_root3*1/6),
-            (1*self._hex_side_size, side_root3*7/6),
-            (3*self._hex_side_size, side_root3/2)
+            (-theme.HEX_SIDE_SIZE, theme.HEX_SIDE_SIZE_ROOT_3/2),
+            (theme.HEX_SIDE_SIZE, -theme.HEX_SIDE_SIZE_ROOT_3*1/6),
+            (1*theme.HEX_SIDE_SIZE, theme.HEX_SIDE_SIZE_ROOT_3*7/6),
+            (3*theme.HEX_SIDE_SIZE, theme.HEX_SIDE_SIZE_ROOT_3/2)
         )
         coords = [
             [x+y for x, y in zip(start_coords[0], offsets[0])],
@@ -389,7 +381,7 @@ class HexInterface(DogPlayerInterface):
         self.__canvas.tag_raise("hexagon")
 
     def fix_y(self, y):
-        return self._canvas_size_y - y
+        return theme.CANVAS_SIZE_Y - y
 
     # StartMatch
     def player_press_action_button(self):
