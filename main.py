@@ -398,12 +398,12 @@ class HexInterface(DogPlayerInterface):
 
     def start_match(self):
         start_status = self._dog_server_interface.start_match(2)
-        if start_status.get_code() in '01': self.__notification_label.configure(text=start_status.get_message())
+        if str(start_status.get_code()) in '01': self.__notification_label.configure(text=start_status.get_message())
         else: self.start_game(start_status)
 
     # ReceiveStart
     def receive_start(self, start_status: StartStatus) -> None:
-        if start_status.get_code() == 0 or start_status.get_code() == 1: print(start_status.get_message())
+        if str(start_status.get_code()) in "01": self.__notification_label.configure(text=start_status.get_message())
         else: self.start_game(start_status, True)
 
     # StartGame
