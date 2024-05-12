@@ -1,4 +1,6 @@
 from enum import Enum
+from typing import TypedDict, Optional
+
 import tkinter as tk
 from tkinter import simpledialog
 from themes import *
@@ -8,6 +10,11 @@ from dog.dog_actor import DogActor
 from dog.start_status import StartStatus
 
 theme = Theme()
+
+class dog_message(TypedDict):
+    match_status: str
+    marked_cell: tuple[int, int]
+    winning_path: Optional[list[tuple[int, int]]]
 
 class GameState(Enum):
     WAITING = 0
@@ -438,7 +445,7 @@ class HexInterface(DogPlayerInterface):
 
         winning_path = self.game.check_winner()
 
-        move = {'match_status': 'next'}
+        move: dog_message = {'match_status': 'next'}
         move['marked_cell'] = (i, j)
         if winning_path:
             self.__notification_label.configure(text=f"{self.game.current_player_turn.name} venceu!")
@@ -452,7 +459,7 @@ class HexInterface(DogPlayerInterface):
         self._dog_server_interface.send_move(move)
 
     # ReceiveMove
-    def receive_move(self, a_move):
+    def receive_move(self, a_move: dog_message):
         if a_move['match_status'] == 'finished':
             self.__notification_label.configure(text=f"{self.game.current_player_turn.name} venceu!")
             winning_path = a_move['winning_path']

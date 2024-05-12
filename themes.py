@@ -1,7 +1,10 @@
 from dataclasses import dataclass, field
+from typing import TypedDict
 
 color = str
-button_theme = dict[str, color]
+class button_theme(TypedDict):
+    bg: color
+    fg: color
 
 @dataclass
 class Theme:
