@@ -10,7 +10,7 @@ Para executar o programa, primeiro crie um ambiente virtual e ative-o de acordo 
 ```
 Instale as dependências
 ```
-    pip install -f requirements.txt
+    pip install -r requirements.txt
 ```
 Execute o programa
 ```
