@@ -91,22 +91,28 @@ class Game:
         return cell
 
     def check_winner(self):
-        cell = Cell.P1 if self.current_player_turn == self.player1 else Cell.P2
-        queue = [(0, b) if cell == Cell.P2 else (b, 0) for b in range(self.size)]
-        possible_end_cells = [(self.size-1, b) if cell == Cell.P2 else (b, self.size-1) for b in range(self.size)]
-        queue = [possible_start for possible_start in queue if self._board[possible_start[0]][possible_start[1]] == cell]
-        possible_end_cells = [possible_cell for possible_cell in possible_end_cells if self._board[possible_cell[0]][possible_cell[1]] == cell]
-        if not queue or not possible_end_cells: return None
+        queue, goal, cell = [], [], None
+        if self.current_player_turn == self.player1:
+            cell = Cell.P1
+            for i in range(self.size):
+                if self.board[i][0] == cell: queue.append((i, 0))
+                if self.board[i][self.size-1] == cell: goal.append((i, self.size-1))
+        else:
+            cell = Cell.P2
+            for i in range(self.size):
+                if self.board[0][i] == cell: queue.append((0, i))
+                if self.board[self.size-1][i] == cell: goal.append((self.size-1, i))
+
+        if not queue or not goal: return None
 
         current_cell = None
-
         bfs_visited = set(queue)
         bfs_tree = {}
 
         while queue:
             current_cell = queue.pop(0)
-            if current_cell in possible_end_cells: break
-            
+            if current_cell in goal: break
+
             for neighbor in self.cell_neighbors(*current_cell):
                 if (neighbor not in bfs_visited) and self._board[neighbor[0]][neighbor[1]] == cell:
                     bfs_tree[neighbor] = current_cell
