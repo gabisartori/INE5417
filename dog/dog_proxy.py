@@ -112,7 +112,13 @@ class DogProxy:
         post_data = {"player_id": self.player_id, "game_id": self.game_id}
         resp = requests.post(url, data=post_data)
         resp_json = resp.text
-        seek_result = json.loads(resp_json)
+        try:
+            seek_result = json.loads(resp_json)
+        except:
+            print("Erro na leitura do JSON")
+            with open("error.json", "w") as error_file:
+                error_file.write(resp_json)
+            seek_result = {}
         if bool(seek_result):
             move_dictionary = eval(
                 seek_result["1"]
