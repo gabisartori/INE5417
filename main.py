@@ -20,6 +20,7 @@ class GameState(Enum):
     WAITING = 0
     RUNNING = 1
     ENDED = 2
+    WITHDRAWN = 3
 
 class Cell(Enum):
     EMPTY = 0
@@ -72,22 +73,22 @@ class Player:
         self._color, self._piece_color = self.calculate_colors()
 
 class Game:
-    def __init__(self, screen: 'HexInterface', size: int) -> None:
-        self._size = size
-        self._screen = screen
-        self._local_player = None
+    def __init__(self, size: int) -> None:
+        self._size: int = size
+        self._local_player: Player = None
         # Equivalent to restarting the game
-        self._board = [[Cell.EMPTY for _ in range(size)] for _ in range(size)]
-        self._player1 = None
-        self._player2 = None
-        self._current_player_turn = None
-        self._game_state = GameState.WAITING
+        self._board: list[list[Cell]] = [[Cell.EMPTY for _ in range(size)] for _ in range(size)]
+        self._player1: Player = None
+        self._player2: Player = None
+        self._current_player_turn: Player = None
+        self._winner: Player = None
+        self._game_state: GameState = GameState.WAITING
+        self._winning_path: list[tuple[int, int]] = None
 
     def insert_cell(self, i, j):
         if self._board[i][j] != Cell.EMPTY: return None
         cell = Cell.P1 if self.current_player_turn == self.player1 else Cell.P2
         self._board[i][j] = cell
-        self._screen.draw_hexagon(i, j, self.current_player_turn.piece_color)
         return cell
 
     def check_winner(self):
@@ -141,7 +142,9 @@ class Game:
         self.player1 = None
         self.player2 = None
         self.current_player_turn = None
+        self.winner = None
         self.game_state = GameState.WAITING
+        self.winning_path = None
 
     def switch_player_turn(self):
         self.current_player_turn = self.player1 if self.current_player_turn == self.player2 else self.player2
@@ -171,13 +174,20 @@ class Game:
         return self._current_player_turn
 
     @property
+    def winner(self) -> Player | None:
+        return self._winner
+
+    @property
     def game_state(self) -> GameState:
         return self._game_state
+
+    @property
+    def winning_path(self) -> list[tuple[int, int]]:
+        return self._winning_path
 
     @local_player.setter
     def local_player(self, player: Player) -> None:
         self._local_player = player
-        self._screen.update_style_player_change()
 
     @board.setter
     def board(self, board: list[list[Cell]]) -> None:
@@ -186,22 +196,26 @@ class Game:
     @player1.setter
     def player1(self, player: Player) -> None:
         self._player1 = player
-        self._screen.update_style_player_change()
 
     @player2.setter
     def player2(self, player: Player) -> None:
         self._player2 = player
-        self._screen.update_style_player_change()
 
     @current_player_turn.setter
     def current_player_turn(self, player: Player) -> None:
         self._current_player_turn = player
-        self._screen.update_style_player_change()
+
+    @winner.setter
+    def winner(self, player: Player) -> None:
+        self._winner = player
 
     @game_state.setter
     def game_state(self, game_state: GameState) -> None:
         self._game_state = game_state
-        self._screen.update_style_game_state_change()
+
+    @winning_path.setter
+    def winning_path(self, path: list[tuple[int, int]]) -> None:
+        self._winning_path = path
 
 class HexInterface(DogPlayerInterface):
     # Initialize
@@ -211,7 +225,7 @@ class HexInterface(DogPlayerInterface):
 
         # Screen and game info
         self._root = tk.Tk()
-        self._game = Game(self, theme.GAME_SIZE)
+        self._game = Game(theme.GAME_SIZE)
 
         ### Screen components
         # Labels
@@ -222,60 +236,82 @@ class HexInterface(DogPlayerInterface):
         self.__current_player_label = tk.Label(self.root)
 
         # Buttons
-        self.__action_button = tk.Button(command=self.player_press_action_button)
+        self.__action_button = tk.Button()
 
         # Canva
         self.__canvas = tk.Canvas(self.root, width=theme.CANVAS_SIZE_X, height=theme.CANVAS_SIZE_Y)
 
         # Initialize screen
         self.build_screen()
-        self.update_style_game_state_change()
 
         # Register local player and conect to DOG
-        self.game.player1 = Player(simpledialog.askstring(title="Apelido de jogador", prompt="Qual o seu nome?"))
-        dog_connection_message = self._dog_server_interface.initialize(self.game.player1.name, self)
+        self.game.local_player = Player(simpledialog.askstring(title="Apelido de jogador", prompt="Qual o seu nome?"))
+        dog_connection_message = self._dog_server_interface.initialize(self.game.local_player.name, self)
         self.__notification_label.configure(text=dog_connection_message)
+        self.update_screen()
 
-    def update_style_player_change(self):
-        if self.game.player1 != None:
-            self.__player1_label.configure(text=self.game.player1.name, fg=self.game.player1.color)
-        elif self.game.local_player != None:
-            self.__player1_label.configure(text=self.game.local_player.name, fg=theme.TEXT_COLOR)
-        else:
-            self.__player1_label.configure(text="Esperando", fg=theme.TEXT_COLOR)
-        if self.game.player2 != None:
-            self.__player2_label.configure(text=self.game.player2.name, fg=self.game.player2.color)
-        else:
+    def update_screen(self):
+        self.__canvas.delete("all")
+        if self.game.game_state == GameState.WAITING:
+            # Players
+            if self.game.local_player:
+                self.__player1_label.configure(text=self.game.local_player.name, fg=theme.TEXT_COLOR)
+            else:
+                self.__player1_label.configure(text="Esperando", fg=theme.TEXT_COLOR)
             self.__player2_label.configure(text="Esperando", fg=theme.TEXT_COLOR)
-        if self.game.current_player_turn != None:
-            self.__current_player_label.configure(text=f"Vez de {self.game.current_player_turn.name}", fg=self.game.current_player_turn.color)
-        else:
             self.__current_player_label.configure(text="")
 
-    def update_style_game_state_change(self):
-        if self.game.game_state == GameState.WAITING:
-            self.__action_button.configure(text="Começar")
-            # Set canvas background color and bind mouse events to empty hexagons
+            # Board
+            for i in range(self.game.size):
+                for j in range(self.game.size):
+                    self.draw_hexagon(i, j, theme.BACKGROUND_COLOR)
+
+            # Setup
+            self.__action_button.configure(text="Começar", command=self.start_match)
+            self.__notification_label.configure(text="")
+
+        elif self.game.game_state == GameState.RUNNING:
+            self.__player1_label.configure(text=self.game.player1.name, fg=self.game.player1.color)
+            self.__player2_label.configure(text=self.game.player2.name, fg=self.game.player2.color)
+            self.__current_player_label.configure(text=f"Vez de {self.game.current_player_turn.name}", fg=self.game.current_player_turn.color)
+
+            self.draw_borders(self.game.player1)
+            self.draw_borders(self.game.player2)
             def handle_mouse_move(hexagon, out):
-                if self.game.game_state != GameState.RUNNING: return
                 if self.game.current_player_turn != self.game.local_player: return
                 self.__canvas.itemconfig(hexagon, fill=theme.BACKGROUND_COLOR if out else self.game.current_player_turn.piece_color)
 
-            self.__canvas.delete("all")
+            self.__action_button.configure(text="Desistir", command=self._root.quit)
+
             for i in range(self.game.size):
                 for j in range(self.game.size):
-                    hexagon = self.draw_hexagon(i, j, theme.BACKGROUND_COLOR)
-                    self.__canvas.tag_bind(hexagon, "<Button-1>", lambda e, i=i, j=j: self.choose_cell(i, j))
-                    self.__canvas.tag_bind(hexagon, "<Enter>", lambda e, hexagon=hexagon: handle_mouse_move(hexagon, False))
-                    self.__canvas.tag_bind(hexagon, "<Leave>", lambda e, hexagon=hexagon: handle_mouse_move(hexagon, True))
-
-        elif self.game.game_state == GameState.RUNNING:
-            self.draw_borders(self.game.player1)
-            self.draw_borders(self.game.player2)
-            self.__action_button.configure(text="Desistir")
+                    if self.game.board[i][j] == Cell.EMPTY:
+                        hexagon = self.draw_hexagon(i, j, theme.BACKGROUND_COLOR)
+                        self.__canvas.tag_bind(hexagon, "<Button-1>", lambda e, i=i, j=j: self.choose_cell(i, j))
+                        self.__canvas.tag_bind(hexagon, "<Enter>", lambda e, hexagon=hexagon: handle_mouse_move(hexagon, False))
+                        self.__canvas.tag_bind(hexagon, "<Leave>", lambda e, hexagon=hexagon: handle_mouse_move(hexagon, True))
+                    elif self.game.board[i][j] == Cell.P1:
+                        self.draw_hexagon(i, j, self.game.player1.piece_color)
+                    else:
+                        self.draw_hexagon(i, j, self.game.player2.piece_color)
 
         else:
-            self.__action_button.configure(text="Recomeçar")
+            self.draw_borders(self.game.player1)
+            self.draw_borders(self.game.player2)
+            for i in range(self.game.size):
+                for j in range(self.game.size):
+                    if self.game.board[i][j] == Cell.EMPTY:
+                        self.draw_hexagon(i, j, theme.BACKGROUND_COLOR)
+                    elif self.game.board[i][j] == Cell.P1:
+                        self.draw_hexagon(i, j, self.game.player1.piece_color)
+                    else:
+                        self.draw_hexagon(i, j, self.game.player2.piece_color)
+            self.__action_button.configure(text="Restaurar", command=self.restart_game)
+            if self.game.game_state == GameState.WITHDRAWN:
+                self.__notification_label.configure(text="Adversário desistiu!")
+            else:
+                self.__notification_label.configure(text=f"{self.game.winner.name} venceu!")
+                self.draw_winning_path(self.game.winning_path)
 
     def build_screen(self):
         '''Configures the default styling and layout of the screen components.'''
@@ -305,6 +341,8 @@ class HexInterface(DogPlayerInterface):
 
         # Board
         self.__canvas.grid(row=2, column=1, padx=10, pady=10)
+
+        self.update_screen()
 
     # Draw Board
     def draw_hexagon(self, i, j, color, edgecolor=theme.HEXAGON_BORDER_COLOR):
@@ -393,15 +431,14 @@ class HexInterface(DogPlayerInterface):
             )
         self.__canvas.tag_raise("hexagon")
 
+    def draw_winning_path(self, path: list[tuple[int, int]]):
+        for i, j in path:
+            self.draw_hexagon(i, j, self.game.current_player_turn.color)
+
     def fix_y(self, y):
         return theme.CANVAS_SIZE_Y - y
 
     # StartMatch
-    def player_press_action_button(self):
-        if self.game.game_state == GameState.WAITING: self.start_match()
-        elif self.game.game_state == GameState.RUNNING: self.root.quit()
-        elif self.game.game_state == GameState.ENDED: self.restart_game()
-
     def start_match(self):
         start_status = self._dog_server_interface.start_match(2)
         if str(start_status.get_code()) in '01': self.__notification_label.configure(text=start_status.get_message())
@@ -436,11 +473,11 @@ class HexInterface(DogPlayerInterface):
         self.game.game_state = GameState.RUNNING
         p1_turn = (str(p1[2]) == "1")
         self.game.current_player_turn = self.game.player1 if p1_turn else self.game.player2
-        self.__notification_label.configure(text=f"Partida iniciada!")
+        self.update_screen()
 
     def restart_game(self):
-        self.__notification_label.configure(text="")
         self.game.restart()
+        self.update_screen()
 
     # ChooseCell
     def choose_cell(self, i, j):
@@ -454,32 +491,34 @@ class HexInterface(DogPlayerInterface):
         move: dog_message = {'match_status': 'next'}
         move['marked_cell'] = (i, j)
         if winning_path:
-            self.__notification_label.configure(text=f"{self.game.current_player_turn.name} venceu!")
             self.game.game_state = GameState.ENDED
-            [self.draw_hexagon(i, j, self.game.current_player_turn.color) for i, j in winning_path]
+            self.game.winning_path = winning_path
+            self.game.winner = self.game.current_player_turn
             move['match_status'] = 'finished'
             move['winning_path'] = winning_path
         else:
             self.game.switch_player_turn()
 
+        self.update_screen()
         self._dog_server_interface.send_move(move)
 
     # ReceiveMove
     def receive_move(self, a_move: dog_message):
         if a_move['match_status'] == 'finished':
-            self.__notification_label.configure(text=f"{self.game.current_player_turn.name} venceu!")
-            winning_path = a_move['winning_path']
-            [self.draw_hexagon(i, j, self.game.current_player_turn.color) for i, j in winning_path]
+            self.game.winning_path = a_move['winning_path']
+            self.game.winner = self.game.current_player_turn
             self.game.game_state = GameState.ENDED
         else:
             i, j = a_move['marked_cell']
             self.game.insert_cell(i, j)
             self.game.switch_player_turn()
+        self.update_screen()
 
     # ReceiveLeave
     def receive_withdrawal_notification(self):
-        self.__notification_label.configure(text="O oponente desistiu!")
-        self.game.game_state = GameState.ENDED
+        self.game.game_state = GameState.WITHDRAWN
+        self.game.winner = self.game.current_player_turn
+        self.update_screen()
 
     # Auxiliars
     @staticmethod
@@ -497,4 +536,4 @@ class HexInterface(DogPlayerInterface):
         return self._game
 
 
-if __name__ == "__main__": hex_interface = HexInterface().root.mainloop()
+if __name__ == "__main__": HexInterface().root.mainloop()
