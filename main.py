@@ -306,7 +306,7 @@ class HexInterface(DogPlayerInterface):
                         self.draw_hexagon(i, j, self.game.player1.piece_color)
                     else:
                         self.draw_hexagon(i, j, self.game.player2.piece_color)
-            self.__action_button.configure(text="Restaurar", command=self.restart_game)
+            self.__action_button.configure(text="Restaurar", command=self.restore_inital_state)
             if self.game.game_state == GameState.WITHDRAWN:
                 self.__notification_label.configure(text="Adversário desistiu!")
             else:
@@ -452,7 +452,7 @@ class HexInterface(DogPlayerInterface):
     # StartGame
     def start_game(self, start_status: StartStatus, received=False):
         '''Sets things up for when a match starts, depending on who started it.'''
-        self.restart_game()
+        self.restore_inital_state()
         
         players = start_status.get_players()
         # I'm not sure if this check is necessary
@@ -475,7 +475,7 @@ class HexInterface(DogPlayerInterface):
         self.game.current_player_turn = self.game.player1 if p1_turn else self.game.player2
         self.update_screen()
 
-    def restart_game(self):
+    def restore_inital_state(self):
         self.game.restart()
         self.update_screen()
 
