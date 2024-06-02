@@ -45,7 +45,8 @@ class Player:
         if len(g) == 1: g = '0' + g
         if len(b) == 1: b = '0' + b
 
-        return "#" + r1 + g1 + b1, "#" + r + g + b
+        self._color, self._piece_color =  "#" + r1 + g1 + b1, "#" + r + g + b
+        return self._color, self._piece_color
 
     @property
     def name(self):
@@ -70,7 +71,7 @@ class Player:
     @hue.setter
     def hue(self, hue):
         self._hue = hue
-        self._color, self._piece_color = self.calculate_colors()
+        self.calculate_colors()
 
 class Game:
     def __init__(self, size: int) -> None:
@@ -85,7 +86,7 @@ class Game:
         self._game_state: GameState = GameState.WAITING
         self._winning_path: list[tuple[int, int]] = None
 
-    def insert_cell(self, i, j):
+    def insert_cell(self, i, j) -> Cell | None:
         if self._board[i][j] != Cell.EMPTY: return None
         cell = Cell.P1 if self.current_player_turn == self.player1 else Cell.P2
         self._board[i][j] = cell
@@ -127,7 +128,7 @@ class Game:
 
         return path
 
-    def cell_neighbors(self, i, j) -> set[Cell]:
+    def cell_neighbors(self, i, j) -> set[tuple[int, int]]:
         neighbors = set()
         for x in range(-1, 2):
             for y in range(-1, 2):
@@ -253,30 +254,50 @@ class HexInterface(DogPlayerInterface):
     def update_screen(self):
         self.__canvas.delete("all")
         self.draw_board()
+        p1 = p1c = p2 = p2c = current = currentc = action = action_message = None
         if self.game.game_state == GameState.WAITING:
-            # Players
-            if self.game.local_player:
-                self.__player1_label.configure(text=self.game.local_player.name, fg=theme.TEXT_COLOR)
-            else:
-                self.__player1_label.configure(text="Esperando", fg=theme.TEXT_COLOR)
-            self.__player2_label.configure(text="Esperando", fg=theme.TEXT_COLOR)
-            self.__current_player_label.configure(text="")
-
-            # Setup
-            self.__action_button.configure(text="Começar", command=self.start_match)
-
+            p1 = self.game.local_player.name if self.game.local_player else "Esperando"
+            p1c = theme.TEXT_COLOR
+            p2 = "Esperando"
+            p2c = theme.TEXT_COLOR
+            current = ""
+            currentc = theme.TEXT_COLOR
+            action = self.start_match
+            action_message = "Começar"
         elif self.game.game_state == GameState.RUNNING:
-            self.__player1_label.configure(text=self.game.player1.name, fg=self.game.player1.color)
-            self.__player2_label.configure(text=self.game.player2.name, fg=self.game.player2.color)
-            self.__current_player_label.configure(text=f"Vez de {self.game.current_player_turn.name}", fg=self.game.current_player_turn.color)
-            self.__action_button.configure(text="Desistir", command=self._root.quit)
-        else:
-            self.__action_button.configure(text="Restaurar", command=self.restore_inital_state)
-            if self.game.game_state == GameState.WITHDRAWN:
-                self.__notification_label.configure(text="Adversário desistiu!")
-            else:
-                self.__notification_label.configure(text=f"{self.game.winner.name} venceu!")
-                self.draw_winning_path(self.game.winning_path)
+            p1 = self.game.player1.name
+            p1c = self.game.player1.color
+            p2 = self.game.player2.name
+            p2c = self.game.player2.color
+            current = f"Vez de {self.game.current_player_turn.name}"
+            currentc = self.game.current_player_turn.color
+            action = self._root.quit
+            action_message = "Desistir"
+        elif self.game.game_state == GameState.ENDED:
+            p1 = self.game.player1.name
+            p1c = self.game.player1.color
+            p2 = self.game.player2.name
+            p2c = self.game.player2.color
+            current = f"{self.game.winner.name} venceu!"
+            currentc = self.game.winner.color
+            action = self.restore_inital_state
+            action_message = "Restaurar"
+        elif self.game.game_state == GameState.WITHDRAWN:
+            p1 = self.game.player1.name
+            p1c = self.game.player1.color
+            p2 = self.game.player2.name
+            p2c = self.game.player2.color
+            current = ""
+            currentc = theme.TEXT_COLOR
+            action = self.restore_inital_state
+            action_message = "Restaurar"
+            self.__notification_label.configure(text="Adversário desistiu!")
+
+        self.__player1_label.configure(text=p1, fg=p1c)
+        self.__player2_label.configure(text=p2, fg=p2c)
+        self.__current_player_label.configure(text=current, fg=currentc)
+        self.__action_button.configure(text=action_message, command=action)
+
 
     def draw_board(self):
         def handle_mouse_move(hexagon, out):
@@ -332,7 +353,7 @@ class HexInterface(DogPlayerInterface):
         self.update_screen()
 
     # Draw Board
-    def draw_hexagon(self, i, j, color, edgecolor=theme.HEXAGON_BORDER_COLOR):
+    def draw_hexagon(self, i: int, j: int, color, edgecolor=theme.HEXAGON_BORDER_COLOR) -> int:
         x, y = self.hex_starting_point(i, j)
 
         hexagon = self.__canvas.create_polygon(
@@ -350,7 +371,7 @@ class HexInterface(DogPlayerInterface):
         )
         return hexagon
 
-    def hex_starting_point(self, i, j):
+    def hex_starting_point(self, i: int, j: int) -> tuple[int, int]:
         i, j = self.convert_ij(i, j)
 
         n = self.game.size - abs(i+1-self.game.size)
@@ -363,7 +384,7 @@ class HexInterface(DogPlayerInterface):
 
         return x, y
 
-    def convert_ij(self, i, j):
+    def convert_ij(self, i: int, j: int) -> tuple[int, int]:
         m = [[(x, y) for y in range(self.game.size)] for x in range(self.game.size)]
         tilt = []
 
@@ -422,7 +443,7 @@ class HexInterface(DogPlayerInterface):
         for i, j in path:
             self.draw_hexagon(i, j, self.game.current_player_turn.color)
 
-    def fix_y(self, y):
+    def fix_y(self, y: int) -> int:
         return theme.CANVAS_SIZE_Y - y
 
     # StartMatch
@@ -496,15 +517,14 @@ class HexInterface(DogPlayerInterface):
             self.game.winner = self.game.current_player_turn
             self.game.game_state = GameState.ENDED
         else:
-            i, j = a_move['marked_cell']
-            self.game.insert_cell(i, j)
+            self.game.insert_cell(*a_move['marked_cell'])
             self.game.switch_player_turn()
         self.update_screen()
 
     # ReceiveLeave
     def receive_withdrawal_notification(self):
         self.game.game_state = GameState.WITHDRAWN
-        self.game.winner = self.game.current_player_turn
+        self.game.winner = self.game.local_player
         self.update_screen()
 
     # Auxiliars
