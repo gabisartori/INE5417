@@ -252,6 +252,7 @@ class HexInterface(DogPlayerInterface):
 
     def update_screen(self):
         self.__canvas.delete("all")
+        self.draw_board()
         if self.game.game_state == GameState.WAITING:
             # Players
             if self.game.local_player:
@@ -261,57 +262,43 @@ class HexInterface(DogPlayerInterface):
             self.__player2_label.configure(text="Esperando", fg=theme.TEXT_COLOR)
             self.__current_player_label.configure(text="")
 
-            # Board
-            for i in range(self.game.size):
-                for j in range(self.game.size):
-                    self.draw_hexagon(i, j, theme.BACKGROUND_COLOR)
-
             # Setup
             self.__action_button.configure(text="Começar", command=self.start_match)
-            self.__notification_label.configure(text="")
 
         elif self.game.game_state == GameState.RUNNING:
             self.__player1_label.configure(text=self.game.player1.name, fg=self.game.player1.color)
             self.__player2_label.configure(text=self.game.player2.name, fg=self.game.player2.color)
             self.__current_player_label.configure(text=f"Vez de {self.game.current_player_turn.name}", fg=self.game.current_player_turn.color)
-
-            self.draw_borders(self.game.player1)
-            self.draw_borders(self.game.player2)
-            def handle_mouse_move(hexagon, out):
-                if self.game.current_player_turn != self.game.local_player: return
-                self.__canvas.itemconfig(hexagon, fill=theme.BACKGROUND_COLOR if out else self.game.current_player_turn.piece_color)
-
             self.__action_button.configure(text="Desistir", command=self._root.quit)
-
-            for i in range(self.game.size):
-                for j in range(self.game.size):
-                    if self.game.board[i][j] == Cell.EMPTY:
-                        hexagon = self.draw_hexagon(i, j, theme.BACKGROUND_COLOR)
-                        self.__canvas.tag_bind(hexagon, "<Button-1>", lambda e, i=i, j=j: self.choose_cell(i, j))
-                        self.__canvas.tag_bind(hexagon, "<Enter>", lambda e, hexagon=hexagon: handle_mouse_move(hexagon, False))
-                        self.__canvas.tag_bind(hexagon, "<Leave>", lambda e, hexagon=hexagon: handle_mouse_move(hexagon, True))
-                    elif self.game.board[i][j] == Cell.P1:
-                        self.draw_hexagon(i, j, self.game.player1.piece_color)
-                    else:
-                        self.draw_hexagon(i, j, self.game.player2.piece_color)
-
         else:
-            self.draw_borders(self.game.player1)
-            self.draw_borders(self.game.player2)
-            for i in range(self.game.size):
-                for j in range(self.game.size):
-                    if self.game.board[i][j] == Cell.EMPTY:
-                        self.draw_hexagon(i, j, theme.BACKGROUND_COLOR)
-                    elif self.game.board[i][j] == Cell.P1:
-                        self.draw_hexagon(i, j, self.game.player1.piece_color)
-                    else:
-                        self.draw_hexagon(i, j, self.game.player2.piece_color)
             self.__action_button.configure(text="Restaurar", command=self.restore_inital_state)
             if self.game.game_state == GameState.WITHDRAWN:
                 self.__notification_label.configure(text="Adversário desistiu!")
             else:
                 self.__notification_label.configure(text=f"{self.game.winner.name} venceu!")
                 self.draw_winning_path(self.game.winning_path)
+
+    def draw_board(self):
+        def handle_mouse_move(hexagon, out):
+            if self.game.game_state != GameState.RUNNING: return
+            if self.game.current_player_turn != self.game.local_player: return
+            self.__canvas.itemconfig(hexagon, fill=theme.BACKGROUND_COLOR if out else self.game.current_player_turn.piece_color)
+        if self.game.game_state != GameState.WAITING:
+            self.draw_borders(self.game.player1)
+            self.draw_borders(self.game.player2)
+        for i in range(self.game.size):
+            for j in range(self.game.size):
+                if self.game.board[i][j] == Cell.EMPTY:
+                    hexagon = self.draw_hexagon(i, j, theme.BACKGROUND_COLOR)
+                    self.__canvas.tag_bind(hexagon, "<Button-1>", lambda e, i=i, j=j: self.choose_cell(i, j))
+                    self.__canvas.tag_bind(hexagon, "<Enter>", lambda e, hexagon=hexagon: handle_mouse_move(hexagon, False))
+                    self.__canvas.tag_bind(hexagon, "<Leave>", lambda e, hexagon=hexagon: handle_mouse_move(hexagon, True))
+                elif self.game.board[i][j] == Cell.P1:
+                    self.draw_hexagon(i, j, self.game.player1.piece_color)
+                else:
+                    self.draw_hexagon(i, j, self.game.player2.piece_color)
+        if self.game.game_state == GameState.ENDED:
+            self.draw_winning_path(self.game.winning_path)
 
     def build_screen(self):
         '''Configures the default styling and layout of the screen components.'''
