@@ -223,6 +223,7 @@ class HexInterface(DogPlayerInterface):
     def __init__(self) -> None:
         # DogPlayerInterface
         self._dog_server_interface = DogActor()
+        self._dog_conneted = None
 
         # Screen and game info
         self._root = tk.Tk()
@@ -247,15 +248,25 @@ class HexInterface(DogPlayerInterface):
 
         # Register local player and conect to DOG
         self.game.local_player = Player(simpledialog.askstring(title="Apelido de jogador", prompt="Qual o seu nome?"))
-        dog_connection_message = self._dog_server_interface.initialize(self.game.local_player.name, self)
+        dog_connection_message = self.dog_server_interface.initialize(self.game.local_player.name, self)
         self.__notification_label.configure(text=dog_connection_message)
+        self.connected_dog = dog_connection_message.lower() == "conectado a dog server"
         self.update_screen()
 
     def update_screen(self):
         self.__canvas.delete("all")
         self.draw_board()
         p1 = p1c = p2 = p2c = current = currentc = action = action_message = None
-        if self.game.game_state == GameState.WAITING:
+        if self.connected_dog is False:  # Distinguir is False de None
+            p1 = "Desconectado"
+            p1c = theme.TEXT_COLOR
+            p2 = "Desconectado"
+            p2c = theme.TEXT_COLOR
+            current = ""
+            currentc = theme.TEXT_COLOR
+            action = self._root.quit
+            action_message = "Sair"
+        elif self.game.game_state == GameState.WAITING:
             p1 = self.game.local_player.name if self.game.local_player else "Esperando"
             p1c = theme.TEXT_COLOR
             p2 = "Esperando"
@@ -448,7 +459,7 @@ class HexInterface(DogPlayerInterface):
 
     # StartMatch
     def start_match(self):
-        start_status = self._dog_server_interface.start_match(2)
+        start_status = self.dog_server_interface.start_match(2)
         if str(start_status.get_code()) in '01': self.__notification_label.configure(text=start_status.get_message())
         else: self.start_game(start_status)
 
@@ -508,7 +519,7 @@ class HexInterface(DogPlayerInterface):
             self.game.switch_player_turn()
 
         self.update_screen()
-        self._dog_server_interface.send_move(move)
+        self.dog_server_interface.send_move(move)
 
     # ReceiveMove
     def receive_move(self, a_move: dog_message):
@@ -542,5 +553,16 @@ class HexInterface(DogPlayerInterface):
     def game(self):
         return self._game
 
+    @property
+    def dog_server_interface(self):
+        return self._dog_server_interface
+    
+    @property
+    def connected_dog(self):
+        return self._dog_conneted
+    
+    @connected_dog.setter
+    def connected_dog(self, connected):
+        self._dog_conneted = connected
 
 if __name__ == "__main__": HexInterface().root.mainloop()
