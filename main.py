@@ -86,11 +86,40 @@ class Game:
         self._game_state: GameState = GameState.WAITING
         self._winning_path: list[tuple[int, int]] = None
 
-    def insert_cell(self, i, j) -> Cell | None:
-        if self._board[i][j] != Cell.EMPTY: return None
-        cell = Cell.P1 if self.current_player_turn == self.player1 else Cell.P2
-        self._board[i][j] = cell
-        return cell
+    def make_move(self, i: int, j: int) -> dog_message | None:
+        if self.game_state != GameState.RUNNING: return None
+        if self.current_player_turn != self.local_player: return None
+        if self.board[i][j] != Cell.EMPTY: return None
+        
+        self.board[i][j] = Cell.P1 if self.current_player_turn == self.player1 else Cell.P2
+
+        move = {}
+        if winning_path := self.check_winner():
+            self.game_state = GameState.ENDED
+            self.winning_path = winning_path
+            self.winner = self.local_player
+            move['winning_path'] = winning_path
+            move['match_status'] = 'finished'    
+        else:
+            self.switch_player_turn()
+            move['marked_cell'] = (i, j)
+            move['match_status'] = 'next'
+        
+        return move
+
+    def receive_move(self, a_move: dog_message) -> None:
+        if a_move['match_status'] == 'finished':
+            self.game_state = GameState.ENDED
+            self.winning_path = a_move['winning_path']
+            self.winner = self.current_player_turn
+        else:
+            i, j = a_move['marked_cell']
+            self.board[i][j] = Cell.P1 if self.current_player_turn == self.player1 else Cell.P2
+            self.switch_player_turn()
+
+    def receive_withdraw(self) -> None:
+        self.game_state = GameState.WITHDRAWN
+        self.winner = None
 
     def check_winner(self):
         queue, goal, cell = [], [], None
@@ -500,42 +529,18 @@ class HexInterface(DogPlayerInterface):
 
     # ChooseCell
     def choose_cell(self, i, j):
-        if self.game.game_state != GameState.RUNNING: return
-        if self.game.current_player_turn != self.game.local_player: return
-
-        if self.game.insert_cell(i, j) == None: return
-
-        winning_path = self.game.check_winner()
-
-        move: dog_message = {'match_status': 'next'}
-        move['marked_cell'] = (i, j)
-        if winning_path:
-            self.game.game_state = GameState.ENDED
-            self.game.winning_path = winning_path
-            self.game.winner = self.game.current_player_turn
-            move['match_status'] = 'finished'
-            move['winning_path'] = winning_path
-        else:
-            self.game.switch_player_turn()
-
-        self.update_screen()
-        self.dog_server_interface.send_move(move)
+        if move := self.game.make_move(i, j):
+            self.update_screen()
+            self.dog_server_interface.send_move(move)
 
     # ReceiveMove
     def receive_move(self, a_move: dog_message):
-        if a_move['match_status'] == 'finished':
-            self.game.winning_path = a_move['winning_path']
-            self.game.winner = self.game.current_player_turn
-            self.game.game_state = GameState.ENDED
-        else:
-            self.game.insert_cell(*a_move['marked_cell'])
-            self.game.switch_player_turn()
+        self.game.receive_move(a_move)
         self.update_screen()
 
     # ReceiveLeave
     def receive_withdrawal_notification(self):
-        self.game.game_state = GameState.WITHDRAWN
-        self.game.winner = self.game.local_player
+        self.game.receive_withdraw()
         self.update_screen()
 
     # Auxiliars
