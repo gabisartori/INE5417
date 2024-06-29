@@ -19,6 +19,9 @@ class Theme:
     HEXAGON_BORDER_WIDTH: int = 4
     COLOR_BRIGHTNESS: tuple[float, float] = (1.0, 0.9)
 
+    TITLE_FONT: str = ""
+    TEXT_FONT: str = ""
+
     # Board drawing size (The Y size is calculated from the X size and the number of hexagons in the board)
     CANVAS_PADDING: int = 15
     CANVAS_SIZE_X: int = 800
@@ -28,6 +31,6 @@ class Theme:
     HEX_SIDE_SIZE_ROOT_3: int = int(HEX_SIDE_SIZE*3**(1/2))
 
     def __post_init__(self):
-        self.DEFAULT_BUTTON = {"bg": self.BACKGROUND_COLOR, "fg": self.TEXT_COLOR}
+        self.DEFAULT_BUTTON = {"bg": self.BACKGROUND_COLOR, "fg": self.TEXT_COLOR, "font": (self.TEXT_FONT, 12)}
         self.CANVAS_SIZE_X += 2*self.CANVAS_PADDING
         self.CANVAS_SIZE_Y = 2*self.CANVAS_PADDING + self.GAME_SIZE*self.HEX_SIDE_SIZE_ROOT_3

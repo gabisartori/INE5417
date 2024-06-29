@@ -369,11 +369,11 @@ class HexInterface(DogPlayerInterface):
 
         # Styling
         self.root.configure(bg=theme.BACKGROUND_COLOR)
-        self.__game_title_label.configure(bg=theme.BACKGROUND_COLOR, fg=theme.TEXT_COLOR, font=("Helvetica", 24), pady=30)
-        self.__notification_label.configure(bg=theme.BACKGROUND_COLOR, fg=theme.TEXT_COLOR)
-        self.__player1_label.configure(bg=theme.BACKGROUND_COLOR, fg=theme.TEXT_COLOR)
-        self.__player2_label.configure(bg=theme.BACKGROUND_COLOR, fg=theme.TEXT_COLOR)
-        self.__current_player_label.configure(bg=theme.BACKGROUND_COLOR, fg=theme.TEXT_COLOR)
+        self.__game_title_label.configure(bg=theme.BACKGROUND_COLOR, fg=theme.TEXT_COLOR, font=(theme.TITLE_FONT, 24), pady=30)
+        self.__notification_label.configure(bg=theme.BACKGROUND_COLOR, fg=theme.TEXT_COLOR, font=(theme.TEXT_FONT, 12))
+        self.__player1_label.configure(bg=theme.BACKGROUND_COLOR, fg=theme.TEXT_COLOR, font=(theme.TEXT_FONT, 12))
+        self.__player2_label.configure(bg=theme.BACKGROUND_COLOR, fg=theme.TEXT_COLOR, font=(theme.TEXT_FONT, 12))
+        self.__current_player_label.configure(bg=theme.BACKGROUND_COLOR, fg=theme.TEXT_COLOR, font=(theme.TEXT_FONT, 12))
         self.__action_button.configure(**theme.DEFAULT_BUTTON)
         self.__canvas.configure(bg=theme.BACKGROUND_COLOR, highlightthickness=0)
 
